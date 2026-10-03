@@ -1,14 +1,11 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+//! # edits-audio
+//!
+//! Music analysis for beat-synced editing (tempo, beats, downbeats, drops, sections, accents,
+//! band envelopes) and an offline mixer with time mapping, automation and effects.
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+pub mod analysis;
+pub mod mix;
+pub mod waveform;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+pub use analysis::{AnalysisOptions, AudioAnalysis, Envelope, SectionInfo, analyze};
+pub use mix::{AudioFx, MixClip, mix};

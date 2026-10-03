@@ -1,6 +1,14 @@
 [package]
 name = "edits-audio"
-version = "0.1.0"
-edition = "2024"
+description = "Audio analysis (beats, downbeats, drops, sections, band envelopes) and mixing for EditsEditor"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
 
 [dependencies]
+edits-media.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+realfft.workspace = true
+rayon.workspace = true
