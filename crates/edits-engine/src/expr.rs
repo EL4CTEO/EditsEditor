@@ -171,11 +171,13 @@ pub fn register_common(engine: &mut Engine) {
     engine.register_fn("rad", |x: f64| x.to_radians());
     engine.register_fn("noise", |x: f64| noise1(x, 0));
     engine.register_fn("noise", |x: f64, seed: i64| noise1(x, seed as u64));
+    engine.register_fn("noise", |x: f64, seed: f64| noise1(x, seed as i64 as u64));
     engine.register_fn("fbm", |x: f64| fbm1(x, 0));
     engine.register_fn("hash", |x: f64| hash01(x.to_bits(), 1));
     engine.register_fn("random", |seed: i64| hash01(seed as u64, 99));
-    engine.register_fn("random", |seed: f64| hash01(seed.to_bits(), 99));
+    engine.register_fn("random", |seed: f64| hash01(if seed.fract() == 0.0 { seed as i64 as u64 } else { seed.to_bits() }, 99));
     engine.register_fn("random_range", |a: f64, b: f64, seed: i64| a + (b - a) * hash01(seed as u64, 77));
+    engine.register_fn("random_range", |a: f64, b: f64, seed: f64| a + (b - a) * hash01(seed as i64 as u64, 77));
     engine.register_fn("ease", |name: &str, x: f64| easing_by_name(name).apply(x, 1.0));
     engine.register_fn("ease", |x: f64| Easing::EaseInOutCubic.apply(x, 1.0));
     engine.register_fn("vec2", |x: f64, y: f64| -> Array { vec![Dynamic::from_float(x), Dynamic::from_float(y)] });
@@ -257,7 +259,7 @@ fn register_expr_fns(engine: &mut Engine) {
     engine.register_fn("downbeat_pulse", |decay: f64| with_ctx(|c, _| (-TimingData::since(&c.timing.downbeats, c.root_time) * decay).exp(), 0.0));
     engine.register_fn("drop_pulse", |decay: f64| with_ctx(|c, _| (-TimingData::since(&c.timing.drops, c.root_time) * decay).exp(), 0.0));
     engine.register_fn("accent_pulse", |decay: f64| with_ctx(|c, _| (-TimingData::since(&c.timing.accents, c.root_time) * decay).exp(), 0.0));
-    engine.register_fn("pulse_every", |n: i64, decay: f64| {
+    fn pulse_every(n: i64, decay: f64) -> f64 {
         with_ctx(
             |c, _| match TimingData::last_before(&c.timing.beats, c.root_time) {
                 Some((i, b)) if n > 0 && i as i64 % n == 0 => (-(c.root_time - b) * decay).exp(),
@@ -265,7 +267,9 @@ fn register_expr_fns(engine: &mut Engine) {
             },
             0.0,
         )
-    });
+    }
+    engine.register_fn("pulse_every", pulse_every);
+    engine.register_fn("pulse_every", |n: f64, decay: f64| pulse_every(n as i64, decay));
     engine.register_fn("beat_in_bar", || {
         with_ctx(
             |c, _| {
@@ -294,6 +298,7 @@ fn register_expr_fns(engine: &mut Engine) {
     // ---- noise in time ----
     engine.register_fn("wiggle", |freq: f64, amp: f64| with_ctx(|c, t| fbm1(t * freq, c.seed) * amp, 0.0));
     engine.register_fn("wiggle", |freq: f64, amp: f64, seed: i64| with_ctx(|c, t| fbm1(t * freq, c.seed ^ seed as u64) * amp, 0.0));
+    engine.register_fn("wiggle", |freq: f64, amp: f64, seed: f64| with_ctx(|c, t| fbm1(t * freq, c.seed ^ seed as i64 as u64) * amp, 0.0));
     engine.register_fn("wiggle2", |freq: f64, amp: f64| -> Array {
         with_ctx(
             |c, t| vec![Dynamic::from_float(fbm1(t * freq, c.seed) * amp), Dynamic::from_float(fbm1(t * freq, c.seed ^ 0xBEEF) * amp)],
@@ -355,6 +360,58 @@ impl Default for ExprEngine {
     }
 }
 
+/// Expressions are numeric: agents naturally write `pulse(10)` or `wiggle(4, 3)`, but Rhai never
+/// converts `INT` to `FLOAT` when resolving a function. Integer literals are therefore lexed as
+/// floats, except where an integer is required: inside index brackets (`value[i % 2]`) and in
+/// ranges (`for i in 0..4`). A bracket stack tells index brackets from array literals.
+mod int_lex {
+    use std::cell::RefCell;
+
+    use rhai::{Engine, Token};
+
+    #[derive(Default)]
+    struct State {
+        /// Did the previous token end an operand (so a following `[` indexes it)?
+        after_operand: bool,
+        /// The previous token requires an integer next (`..`, `..=`, `in`).
+        int_next: bool,
+        /// Open brackets: `true` = index brackets.
+        stack: Vec<bool>,
+    }
+
+    thread_local! {
+        static STATE: RefCell<State> = RefCell::default();
+    }
+
+    /// Call before each compile (tokenizing happens on the compiling thread).
+    pub fn reset() {
+        STATE.with_borrow_mut(|s| *s = State::default());
+    }
+
+    pub fn install(engine: &mut Engine) {
+        #[allow(deprecated)]
+        engine.on_parse_token(|token, _, _| {
+            STATE.with_borrow_mut(|s| {
+                let keep = s.int_next || s.stack.last().copied().unwrap_or(false);
+                match &token {
+                    Token::LeftBracket => s.stack.push(s.after_operand),
+                    Token::LeftParen | Token::LeftBrace | Token::MapStart => s.stack.push(false),
+                    Token::RightBracket | Token::RightParen | Token::RightBrace => {
+                        s.stack.pop();
+                    }
+                    _ => {}
+                }
+                s.after_operand = matches!(token, Token::Identifier(_) | Token::RightBracket | Token::RightParen);
+                s.int_next = matches!(token, Token::ExclusiveRange | Token::InclusiveRange | Token::In);
+                match token {
+                    Token::IntegerConstant(i) if !keep => Token::FloatConstant(Box::new(((i as f64).into(), i.to_string().into()))),
+                    other => other,
+                }
+            })
+        });
+    }
+}
+
 impl ExprEngine {
     pub fn new() -> ExprEngine {
         let mut engine = Engine::new();
@@ -366,6 +423,7 @@ impl ExprEngine {
         register_common(&mut engine);
         register_vector_ops(&mut engine, true);
         register_expr_fns(&mut engine);
+        int_lex::install(&mut engine);
         ExprEngine { engine, cache: Mutex::new(HashMap::new()), library: Mutex::new((0, String::new())) }
     }
 
@@ -390,6 +448,7 @@ impl ExprEngine {
         }
         let lib = self.library.lock().1.clone();
         let src = if lib.is_empty() { expr.to_string() } else { format!("{lib}\n{expr}") };
+        int_lex::reset();
         let r = self.engine.compile(&src).map(Arc::new).map_err(|e| e.to_string());
         self.cache.lock().insert(key, r.clone());
         r
@@ -474,5 +533,20 @@ mod tests {
         assert!(w.abs() <= 10.0);
         e.set_library("fn double(x) { x * 2.0 }");
         assert_eq!(e.eval("double(value)", &c, 0.0, &Value::Num(2.0)).unwrap(), Value::Num(4.0));
+    }
+
+    #[test]
+    fn integer_literals() {
+        let e = ExprEngine::new();
+        let c = ctx();
+        let n = |src: &str, v: Value| e.eval(src, &c, 1.05, &v).unwrap_or_else(|err| panic!("{src}: {err}"));
+        assert_eq!(n("pulse(10)", Value::Num(0.0)), n("pulse(10.0)", Value::Num(0.0)));
+        assert_eq!(n("wiggle(4, 3) + max(0, 1)", Value::Num(0.0)), n("wiggle(4.0, 3.0) + max(0.0, 1.0)", Value::Num(0.0)));
+        assert_eq!(n("value[1] * 2", Value::Vec(vec![1.0, 5.0])), Value::Num(10.0));
+        assert_eq!(n("[value[0] + 1, 2]", Value::Vec(vec![1.0, 5.0])), Value::Vec(vec![2.0, 2.0]));
+        assert_eq!(n("let s = 0.0; for i in 0..4 { s += value[i % 2]; } s", Value::Vec(vec![1.0, 2.0])), Value::Num(6.0));
+        assert_eq!(n("random(3)", Value::Num(0.0)), n("random(3.0)", Value::Num(0.0)));
+        assert_eq!(n("if beat_in_bar() == 2 { 1 } else { 0 }", Value::Num(0.0)), Value::Num(1.0));
+        n("pulse_every(2, 8) + noise(t, 3) + random_range(0, 1, 7)", Value::Num(0.0));
     }
 }
