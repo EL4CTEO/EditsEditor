@@ -131,6 +131,16 @@ pub fn build_engine(h: &ProjectHandle) -> Engine {
     e.register_fn("update", |h: &mut ProjectHandle, id: &str, patch: Map| -> RResult<()> { h.with(|p| ops::merge_object(p, id, &map_to_json(&patch))) });
     e.register_fn("set", |h: &mut ProjectHandle, id: &str, path: &str, v: Dynamic| -> RResult<()> { h.with(|p| ops::set_path(p, id, path, from_dyn(&v))) });
     e.register_fn("get", |h: &mut ProjectHandle, id: &str, path: &str| -> RResult<Dynamic> { h.with(|p| ops::get_path(p, id, path)).map(|v| to_dyn(&v)) });
+    // project-level fields: timing, meta, variables, script_library, root, ...
+    e.register_fn("set_project", |h: &mut ProjectHandle, path: &str, v: Dynamic| -> RResult<()> {
+        h.with(|p| {
+            let mut j = serde_json::to_value(&*p)?;
+            let slot = ops::path_get_mut(&mut j, path).ok_or_else(|| edits_core::EditError::NotFound(path.to_string()))?;
+            *slot = from_dyn(&v);
+            *p = serde_json::from_value(j).map_err(|e| edits_core::EditError::Invalid(format!("invalid project after set_project({path}): {e}")))?;
+            Ok(())
+        })
+    });
     e.register_fn("unset", |h: &mut ProjectHandle, id: &str, path: &str| -> RResult<()> { h.with(|p| ops::unset_path(p, id, path)) });
     e.register_fn("keyframe", |h: &mut ProjectHandle, id: &str, path: &str, t: f64, v: Dynamic, ease: &str| -> RResult<()> {
         let val = to_value(&v).ok_or("unsupported keyframe value")?;

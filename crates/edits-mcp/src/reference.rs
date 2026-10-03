@@ -60,7 +60,7 @@ script_run executes code with:
     add_track(name[, comp]) → id; add_clip(track_or_"", #{clip}) → id; add_clip_in(comp, track, #{clip}); add_comp(id, w, h, fps, dur)
     add_effect(target_id, fx(...)) → id; update(id, #{merge patch}); set(id, "path.to.field", value); get(id, path); unset(id, path)
     keyframe(id, path, t, v[, ease]); expr(id, path, "expression" or ""); remove(id); split(id, t) → new id; move_clip(id, start[, track])
-    duplicate(id, start) → id; add_marker(t, label); set_duration(s); set_var(name, v); apply_preset(target_or_"", preset, #{args})
+    duplicate(id, start) → id; add_marker(t, label); set_duration(s); set_var(name, v); set_project(path, v) (project-level: timing, meta, script_library...); apply_preset(target_or_"", preset, #{args})
     clip(id) / object(id) → map; tracks() → ids; clips(track) / clips() → ids; assets([kind]) → ids; asset(id); asset_duration(id); comp(); json(); new_id(prefix)
   timing: beats(), downbeats(), drops(), accents(), sections() (maps start/end/label/energy), bpm(), beats_between(a,b), nearest_beat(t)
   media: scenes(asset) → [#{start,end,motion,brightness,saturation,color,thumb}], subtitles(asset) → [#{start,end,text,words}]
