@@ -78,11 +78,7 @@ impl MediaPool {
     pub fn duration(asset: &Asset) -> Option<f64> {
         match asset.kind {
             AssetKind::Video | AssetKind::Audio | AssetKind::AnimatedImage => asset.info.as_ref().and_then(|i| i.duration),
-            AssetKind::ImageSequence => asset
-                .info
-                .as_ref()
-                .and_then(|i| i.frames)
-                .map(|n| n as f64 / asset.sequence_fps.unwrap_or(24.0)),
+            AssetKind::ImageSequence => asset.info.as_ref().and_then(|i| i.frames).map(|n| n as f64 / asset.sequence_fps.unwrap_or(24.0)),
             _ => None,
         }
     }

@@ -530,8 +530,20 @@ impl EditsServer {
             let mut e = if path.exists() {
                 Engine::open(&path)?
             } else if a.create {
-                let name = a.name.clone().unwrap_or_else(|| path.file_stem().and_then(|x| x.to_str()).unwrap_or("edit").trim_end_matches(".edits").to_string());
-                Engine::create(&path, Project::new(&name, a.width.unwrap_or(1920), a.height.unwrap_or(1080), a.fps.unwrap_or(24.0), a.duration.unwrap_or(30.0)))?
+                let name = a
+                    .name
+                    .clone()
+                    .unwrap_or_else(|| path.file_stem().and_then(|x| x.to_str()).unwrap_or("edit").trim_end_matches(".edits").to_string());
+                Engine::create(
+                    &path,
+                    Project::new(
+                        &name,
+                        a.width.unwrap_or(1920),
+                        a.height.unwrap_or(1080),
+                        a.fps.unwrap_or(24.0),
+                        a.duration.unwrap_or(30.0),
+                    ),
+                )?
             } else {
                 anyhow::bail!("{} does not exist (pass create:true to create it)", path.display());
             };
@@ -543,7 +555,9 @@ impl EditsServer {
         .await
     }
 
-    #[tool(description = "Compact text overview of the whole project: comps, tracks, clips (time ranges, sources, effects, transitions), assets, timing. Cheapest way to see the edit.")]
+    #[tool(
+        description = "Compact text overview of the whole project: comps, tracks, clips (time ranges, sources, effects, transitions), assets, timing. Cheapest way to see the edit."
+    )]
     async fn project_summary(&self) -> Result<CallToolResult, McpError> {
         self.run(|s| {
             let e = engine(s)?;
@@ -571,7 +585,9 @@ impl EditsServer {
         .await
     }
 
-    #[tool(description = "Patch the project or an object: `merge` (RFC 7396 merge patch, easiest) or `ops` (RFC 6902 JSON Patch). The result is validated; invalid changes are rejected atomically.")]
+    #[tool(
+        description = "Patch the project or an object: `merge` (RFC 7396 merge patch, easiest) or `ops` (RFC 6902 JSON Patch). The result is validated; invalid changes are rejected atomically."
+    )]
     async fn project_patch(&self, Parameters(a): Parameters<PatchArgs>) -> Result<CallToolResult, McpError> {
         self.run(move |s| {
             let e = engine(s)?;
@@ -584,7 +600,8 @@ impl EditsServer {
                     json_patch::merge(&mut target, m);
                 }
                 if let Some(o) = &a.ops {
-                    let patch: json_patch::Patch = serde_json::from_value(o.clone()).map_err(|e| edits_core::EditError::Invalid(format!("bad JSON Patch: {e}")))?;
+                    let patch: json_patch::Patch =
+                        serde_json::from_value(o.clone()).map_err(|e| edits_core::EditError::Invalid(format!("bad JSON Patch: {e}")))?;
                     json_patch::patch(&mut target, &patch).map_err(|e| edits_core::EditError::Invalid(e.to_string()))?;
                 }
                 match &a.id {
@@ -600,7 +617,9 @@ impl EditsServer {
         .await
     }
 
-    #[tool(description = "Set (or remove=true to reset) one field/property of an object by dot path, e.g. {id:'c3', path:'transform.scale', value:1.2} or {id:'fx2', path:'params.amount', value:{expr:'10*pulse(8.0)'}}.")]
+    #[tool(
+        description = "Set (or remove=true to reset) one field/property of an object by dot path, e.g. {id:'c3', path:'transform.scale', value:1.2} or {id:'fx2', path:'params.amount', value:{expr:'10*pulse(8.0)'}}."
+    )]
     async fn set(&self, Parameters(a): Parameters<SetArgs>) -> Result<CallToolResult, McpError> {
         self.run(move |s| {
             let e = engine(s)?;
@@ -615,7 +634,9 @@ impl EditsServer {
         .await
     }
 
-    #[tool(description = "Animate a property: replace keyframes, add one keyframe, and/or set an expression. Times are clip-local seconds; ease on a key shapes the segment to the next key.")]
+    #[tool(
+        description = "Animate a property: replace keyframes, add one keyframe, and/or set an expression. Times are clip-local seconds; ease on a key shapes the segment to the next key."
+    )]
     async fn keyframes(&self, Parameters(a): Parameters<KeyframeArgs>) -> Result<CallToolResult, McpError> {
         self.run(move |s| {
             let e = engine(s)?;
@@ -638,10 +659,10 @@ impl EditsServer {
             })?;
             let v = ops::get_path(&e.project, &a.id, &a.path).unwrap_or(Json::Null);
             let mut msg = format!("{}.{} = {}", a.id, a.path, serde_json::to_string(&v)?);
-            if let Some(x) = a.expr.as_ref().filter(|x| !x.is_empty()) {
-                if let Err(err) = e.expr.compile(x) {
-                    msg.push_str(&format!("\nwarning: expression does not compile: {err}"));
-                }
+            if let Some(x) = a.expr.as_ref().filter(|x| !x.is_empty())
+                && let Err(err) = e.expr.compile(x)
+            {
+                msg.push_str(&format!("\nwarning: expression does not compile: {err}"));
             }
             Ok(text(msg))
         })
@@ -685,7 +706,9 @@ impl EditsServer {
 
     // ---------------- media ----------------
 
-    #[tool(description = "Import media: files, folders (recursive optional) or globs. Kinds are auto-detected: video, audio, image, animated_image (gif/webp/apng), svg, image_sequence (pattern with %04d or a folder with kind), font, lut (.cube), subtitles (.lrc/.srt/.vtt/.ass), data. Ids come from file names.")]
+    #[tool(
+        description = "Import media: files, folders (recursive optional) or globs. Kinds are auto-detected: video, audio, image, animated_image (gif/webp/apng), svg, image_sequence (pattern with %04d or a folder with kind), font, lut (.cube), subtitles (.lrc/.srt/.vtt/.ass), data. Ids come from file names."
+    )]
     async fn media_import(&self, Parameters(a): Parameters<ImportArgs>) -> Result<CallToolResult, McpError> {
         self.run(move |s| {
             let e = engine(s)?;
@@ -712,7 +735,9 @@ impl EditsServer {
         .await
     }
 
-    #[tool(description = "Analyze music: tempo, beats, downbeats, drops, sections, accents and loudness envelopes (cached). apply=true (default) writes them to project timing so beat-synced presets and expressions (pulse(), bass()...) work.")]
+    #[tool(
+        description = "Analyze music: tempo, beats, downbeats, drops, sections, accents and loudness envelopes (cached). apply=true (default) writes them to project timing so beat-synced presets and expressions (pulse(), bass()...) work."
+    )]
     async fn analyze_audio(&self, Parameters(a): Parameters<AnalyzeArgs>) -> Result<CallToolResult, McpError> {
         self.run(move |s| {
             let e = engine(s)?;
@@ -729,7 +754,9 @@ impl EditsServer {
         .await
     }
 
-    #[tool(description = "Detect shots/scene cuts in a video asset with per-shot motion, brightness, saturation and average color (cached). preview:true also returns a contact sheet of the shots.")]
+    #[tool(
+        description = "Detect shots/scene cuts in a video asset with per-shot motion, brightness, saturation and average color (cached). preview:true also returns a contact sheet of the shots."
+    )]
     async fn detect_scenes(&self, Parameters(a): Parameters<ScenesArgs>) -> Result<CallToolResult, McpError> {
         self.run(move |s| {
             let e = engine(s)?;
@@ -744,7 +771,19 @@ impl EditsServer {
             let shots = e.detect_scenes(&a.asset, &o)?;
             let rows: Vec<String> = shots
                 .iter()
-                .map(|s| format!("#{} {:.2}-{:.2} ({:.2}s) motion={:.2} bright={:.2} sat={:.2} {}", s.index, s.start, s.end, s.end - s.start, s.motion, s.brightness, s.saturation, s.color))
+                .map(|s| {
+                    format!(
+                        "#{} {:.2}-{:.2} ({:.2}s) motion={:.2} bright={:.2} sat={:.2} {}",
+                        s.index,
+                        s.start,
+                        s.end,
+                        s.end - s.start,
+                        s.motion,
+                        s.brightness,
+                        s.saturation,
+                        s.color
+                    )
+                })
                 .collect();
             let mut out = vec![ContentBlock::text(format!("{} shots\n{}", shots.len(), rows.join("\n")))];
             if a.preview && !shots.is_empty() {
@@ -757,7 +796,9 @@ impl EditsServer {
         .await
     }
 
-    #[tool(description = "See an asset: contact sheet of a video/image/gif at given times (or evenly spaced), or a waveform with beats for audio.")]
+    #[tool(
+        description = "See an asset: contact sheet of a video/image/gif at given times (or evenly spaced), or a waveform with beats for audio."
+    )]
     async fn media_preview(&self, Parameters(a): Parameters<MediaPreviewArgs>) -> Result<CallToolResult, McpError> {
         self.run(move |s| {
             let e = engine(s)?;
@@ -793,7 +834,8 @@ impl EditsServer {
         self.run(move |s| {
             let e = engine(s)?;
             let q = a.query.map(|q| q.to_lowercase());
-            let fams: Vec<String> = e.text.families().into_iter().filter(|f| q.as_ref().is_none_or(|q| f.to_lowercase().contains(q))).collect();
+            let fams: Vec<String> =
+                e.text.families().into_iter().filter(|f| q.as_ref().is_none_or(|q| f.to_lowercase().contains(q))).collect();
             Ok(text(format!("{} families:\n{}", fams.len(), fams.join(", "))))
         })
         .await
@@ -811,7 +853,9 @@ impl EditsServer {
         .await
     }
 
-    #[tool(description = "Add clip(s). Pass `clip` or `clips` (JSON per reference 'format'). track: id, index, or 'new' (default). Missing start = end of the track's last clip; missing duration = media length / speed (or 3 s).")]
+    #[tool(
+        description = "Add clip(s). Pass `clip` or `clips` (JSON per reference 'format'). track: id, index, or 'new' (default). Missing start = end of the track's last clip; missing duration = media length / speed (or 3 s)."
+    )]
     async fn clip_add(&self, Parameters(a): Parameters<ClipAddArgs>) -> Result<CallToolResult, McpError> {
         self.run(move |s| {
             let e = engine(s)?;
@@ -834,10 +878,10 @@ impl EditsServer {
                 for c in &list {
                     let id = ops::add_clip(p, a.comp.as_deref(), target.clone(), c.clone())?;
                     // batch into the same new track
-                    if matches!(target, ops::TrackTarget::New) {
-                        if let Some(loc) = p.find_clip(&id) {
-                            target = ops::TrackTarget::Id(p.compositions[&loc.comp].tracks[loc.track].id.clone());
-                        }
+                    if matches!(target, ops::TrackTarget::New)
+                        && let Some(loc) = p.find_clip(&id)
+                    {
+                        target = ops::TrackTarget::Id(p.compositions[&loc.comp].tracks[loc.track].id.clone());
                     }
                     ids.push(id);
                 }
@@ -852,7 +896,9 @@ impl EditsServer {
         .await
     }
 
-    #[tool(description = "Update a clip with a merge patch, e.g. {id:'c4', patch:{opacity:0.8, blend_mode:'screen', transform:{rotation:10}}}.")]
+    #[tool(
+        description = "Update a clip with a merge patch, e.g. {id:'c4', patch:{opacity:0.8, blend_mode:'screen', transform:{rotation:10}}}."
+    )]
     async fn clip_update(&self, Parameters(a): Parameters<ClipUpdateArgs>) -> Result<CallToolResult, McpError> {
         self.run(move |s| {
             let e = engine(s)?;
@@ -862,13 +908,18 @@ impl EditsServer {
         .await
     }
 
-    #[tool(description = "Clip operations: split (at time), move (start, track), duplicate (start), trim (start and/or end, adjusting the in-point), snap (start to the nearest beat).")]
+    #[tool(
+        description = "Clip operations: split (at time), move (start, track), duplicate (start), trim (start and/or end, adjusting the in-point), snap (start to the nearest beat)."
+    )]
     async fn clip_op(&self, Parameters(a): Parameters<ClipOpArgs>) -> Result<CallToolResult, McpError> {
         self.run(move |s| {
             let e = engine(s)?;
             let msg = e.mutate(&format!("clip {}", a.op), |p| -> edits_core::Result<String> {
                 match a.op.as_str() {
-                    "split" => Ok(format!("new clip {}", ops::split_clip(p, &a.id, a.time.ok_or_else(|| edits_core::EditError::Invalid("split needs time".into()))?)?)),
+                    "split" => Ok(format!(
+                        "new clip {}",
+                        ops::split_clip(p, &a.id, a.time.ok_or_else(|| edits_core::EditError::Invalid("split needs time".into()))?)?
+                    )),
                     "move" => {
                         ops::move_clip(p, &a.id, a.start, a.track.as_deref())?;
                         Ok("moved".into())
@@ -905,27 +956,40 @@ impl EditsServer {
     async fn remove(&self, Parameters(a): Parameters<RemoveArgs>) -> Result<CallToolResult, McpError> {
         self.run(move |s| {
             let e = engine(s)?;
-            let kinds = e.mutate("remove", |p| a.ids.iter().map(|id| ops::remove(p, id).map(|k| format!("{k} {id}"))).collect::<edits_core::Result<Vec<_>>>())?;
+            let kinds = e.mutate("remove", |p| {
+                a.ids.iter().map(|id| ops::remove(p, id).map(|k| format!("{k} {id}"))).collect::<edits_core::Result<Vec<_>>>()
+            })?;
             Ok(text(format!("removed: {}", kinds.join(", "))))
         })
         .await
     }
 
-    #[tool(description = "Add an effect to a clip, track or composition. params values can be numbers, colors, arrays, keyframes or {expr}. See effect_info for params.")]
+    #[tool(
+        description = "Add an effect to a clip, track or composition. params values can be numbers, colors, arrays, keyframes or {expr}. See effect_info for params."
+    )]
     async fn effect_add(&self, Parameters(a): Parameters<EffectAddArgs>) -> Result<CallToolResult, McpError> {
         self.run(move |s| {
             let e = engine(s)?;
             let lib = e.library();
             let def = lib.effect(&a.effect).ok_or_else(|| anyhow::anyhow!("unknown effect '{}' — try effects_list {{query}}", a.effect))?;
             if def.kind != EffectKind::Filter {
-                anyhow::bail!("'{}' is a {}: use it as {}", def.id, def.kind.as_str(), if def.kind == EffectKind::Transition { "a clip's transition_in" } else { "a generator clip source" });
+                anyhow::bail!(
+                    "'{}' is a {}: use it as {}",
+                    def.id,
+                    def.kind.as_str(),
+                    if def.kind == EffectKind::Transition { "a clip's transition_in" } else { "a generator clip source" }
+                );
             }
             let mut fx = EffectInstance::new("", &a.effect);
             if let Some(p) = &a.params {
                 fx.params = serde_json::from_value(p.clone())?;
                 for k in fx.params.keys() {
                     if def.param(k).is_none() {
-                        anyhow::bail!("effect '{}' has no param '{k}'. Params: {}", def.id, def.params.iter().map(|p| p.name.as_str()).collect::<Vec<_>>().join(", "));
+                        anyhow::bail!(
+                            "effect '{}' has no param '{k}'. Params: {}",
+                            def.id,
+                            def.params.iter().map(|p| p.name.as_str()).collect::<Vec<_>>().join(", ")
+                        );
                     }
                 }
             }
@@ -941,7 +1005,9 @@ impl EditsServer {
 
     // ---------------- library ----------------
 
-    #[tool(description = "List effects (filters, transitions, generators) with one-line descriptions. Filter by kind/category/query. 169+ built in.")]
+    #[tool(
+        description = "List effects (filters, transitions, generators) with one-line descriptions. Filter by kind/category/query. 169+ built in."
+    )]
     async fn effects_list(&self, Parameters(a): Parameters<ListArgs>) -> Result<CallToolResult, McpError> {
         self.run(move |s| {
             let lib = match s.engine.as_mut() {
@@ -970,7 +1036,9 @@ impl EditsServer {
         .await
     }
 
-    #[tool(description = "Effect details: kind, description, params (type, default, range, options), passes; source:true includes the WGSL.")]
+    #[tool(
+        description = "Effect details: kind, description, params (type, default, range, options), passes; source:true includes the WGSL."
+    )]
     async fn effect_info(&self, Parameters(a): Parameters<InfoArgs>) -> Result<CallToolResult, McpError> {
         self.run(move |s| {
             let lib = match s.engine.as_mut() {
@@ -987,7 +1055,9 @@ impl EditsServer {
         .await
     }
 
-    #[tool(description = "See what an effect does: applies it (with optional params) to a frame of your edit — or a test card — and returns the image. Works for filters, transitions (at progress) and generators.")]
+    #[tool(
+        description = "See what an effect does: applies it (with optional params) to a frame of your edit — or a test card — and returns the image. Works for filters, transitions (at progress) and generators."
+    )]
     async fn effect_preview(&self, Parameters(a): Parameters<EffectPreviewArgs>) -> Result<CallToolResult, McpError> {
         self.run(move |s| {
             let e = match s.engine.as_mut() {
@@ -998,12 +1068,17 @@ impl EditsServer {
                 }
             };
             let f = e.preview_effect(&a.effect, &a.params.clone().unwrap_or_default(), a.time, a.progress.unwrap_or(0.5))?;
-            Ok(CallToolResult::success(vec![ContentBlock::text(format!("{} preview", a.effect)), image_block(&f, a.max_width.unwrap_or(960), true)?]))
+            Ok(CallToolResult::success(vec![
+                ContentBlock::text(format!("{} preview", a.effect)),
+                image_block(&f, a.max_width.unwrap_or(960), true)?,
+            ]))
         })
         .await
     }
 
-    #[tool(description = "Create or replace a custom WGSL effect stored in the project (same format as built-ins; see reference 'effects'). Validated with naga and compiled on the GPU; errors cite your line numbers.")]
+    #[tool(
+        description = "Create or replace a custom WGSL effect stored in the project (same format as built-ins; see reference 'effects'). Validated with naga and compiled on the GPU; errors cite your line numbers."
+    )]
     async fn effect_create(&self, Parameters(a): Parameters<CreateArgs>) -> Result<CallToolResult, McpError> {
         self.run(move |s| {
             let e = engine(s)?;
@@ -1017,12 +1092,19 @@ impl EditsServer {
                 p.custom_effects.insert(a.id.clone(), a.source.clone());
                 Ok(())
             })?;
-            Ok(text(format!("effect '{}' ({}) ready with params: {}", a.id, def.kind.as_str(), def.params.iter().map(|p| p.name.as_str()).collect::<Vec<_>>().join(", "))))
+            Ok(text(format!(
+                "effect '{}' ({}) ready with params: {}",
+                a.id,
+                def.kind.as_str(),
+                def.params.iter().map(|p| p.name.as_str()).collect::<Vec<_>>().join(", ")
+            )))
         })
         .await
     }
 
-    #[tool(description = "List presets (Rhai recipes: impacts, velocity, entrances, looks, text animations, audio-reactive, timeline builders like auto_amv / beat_cut_montage / lyrics_from_subtitles).")]
+    #[tool(
+        description = "List presets (Rhai recipes: impacts, velocity, entrances, looks, text animations, audio-reactive, timeline builders like auto_amv / beat_cut_montage / lyrics_from_subtitles)."
+    )]
     async fn presets_list(&self, Parameters(a): Parameters<ListArgs>) -> Result<CallToolResult, McpError> {
         self.run(move |s| {
             let lib = match s.engine.as_mut() {
@@ -1037,14 +1119,22 @@ impl EditsServer {
                     out.push_str(&format!("\n## {}\n", p.category));
                     last = p.category.clone();
                 }
-                out.push_str(&format!("- {} ({}): {} [{}]\n", p.id, if p.scope == edits_fx::PresetScope::Clip { "clip" } else { "timeline" }, p.description, p.params.join(", ")));
+                out.push_str(&format!(
+                    "- {} ({}): {} [{}]\n",
+                    p.id,
+                    if p.scope == edits_fx::PresetScope::Clip { "clip" } else { "timeline" },
+                    p.description,
+                    p.params.join(", ")
+                ));
             }
             Ok(text(format!("{} presets{}", list.len(), out)))
         })
         .await
     }
 
-    #[tool(description = "Preset details: scope, params with defaults; source:true includes the Rhai code (copy & modify it with preset_create).")]
+    #[tool(
+        description = "Preset details: scope, params with defaults; source:true includes the Rhai code (copy & modify it with preset_create)."
+    )]
     async fn preset_info(&self, Parameters(a): Parameters<InfoArgs>) -> Result<CallToolResult, McpError> {
         self.run(move |s| {
             let lib = match s.engine.as_mut() {
@@ -1061,7 +1151,9 @@ impl EditsServer {
         .await
     }
 
-    #[tool(description = "Apply a preset. Clip presets need target (clip id); time params like `at` are clip-local seconds. Timeline presets build or modify the whole edit.")]
+    #[tool(
+        description = "Apply a preset. Clip presets need target (clip id); time params like `at` are clip-local seconds. Timeline presets build or modify the whole edit."
+    )]
     async fn preset_apply(&self, Parameters(a): Parameters<PresetApplyArgs>) -> Result<CallToolResult, McpError> {
         self.run(move |s| {
             let e = engine(s)?;
@@ -1079,7 +1171,9 @@ impl EditsServer {
         .await
     }
 
-    #[tool(description = "Create or replace a custom preset (Rhai with //! TOML header; see reference 'scripting'). It becomes available to preset_apply and to other presets.")]
+    #[tool(
+        description = "Create or replace a custom preset (Rhai with //! TOML header; see reference 'scripting'). It becomes available to preset_apply and to other presets."
+    )]
     async fn preset_create(&self, Parameters(a): Parameters<CreateArgs>) -> Result<CallToolResult, McpError> {
         self.run(move |s| {
             let e = engine(s)?;
@@ -1096,7 +1190,9 @@ impl EditsServer {
 
     // ---------------- code ----------------
 
-    #[tool(description = "Run Rhai code against the project (one undoable step). Build timelines procedurally: loop over beats(), scenes(asset), subtitles(asset); call project.add_clip/add_effect/apply_preset... dry_run previews without committing.")]
+    #[tool(
+        description = "Run Rhai code against the project (one undoable step). Build timelines procedurally: loop over beats(), scenes(asset), subtitles(asset); call project.add_clip/add_effect/apply_preset... dry_run previews without committing."
+    )]
     async fn script_run(&self, Parameters(a): Parameters<ScriptArgs>) -> Result<CallToolResult, McpError> {
         self.run(move |s| {
             let e = engine(s)?;
@@ -1121,7 +1217,9 @@ impl EditsServer {
         .await
     }
 
-    #[tool(description = "Evaluate an expression at several clip-local times (debug beat/audio-reactive expressions before attaching them).")]
+    #[tool(
+        description = "Evaluate an expression at several clip-local times (debug beat/audio-reactive expressions before attaching them)."
+    )]
     async fn expression_test(&self, Parameters(a): Parameters<ExprTestArgs>) -> Result<CallToolResult, McpError> {
         self.run(move |s| {
             let e = engine(s)?;
@@ -1165,7 +1263,9 @@ impl EditsServer {
 
     // ---------------- rendering ----------------
 
-    #[tool(description = "Render one frame of the edit and SEE it (returns an image). Also returns render warnings (missing assets, unknown effects, expression errors).")]
+    #[tool(
+        description = "Render one frame of the edit and SEE it (returns an image). Also returns render warnings (missing assets, unknown effects, expression errors)."
+    )]
     async fn render_frame(&self, Parameters(a): Parameters<RenderFrameArgs>) -> Result<CallToolResult, McpError> {
         self.run(move |s| {
             let e = engine(s)?;
@@ -1182,16 +1282,26 @@ impl EditsServer {
             if !r.warnings.is_empty() {
                 info.push_str(&format!("\nwarnings:\n- {}", r.warnings.join("\n- ")));
             }
-            Ok(CallToolResult::success(vec![ContentBlock::text(info), image_block(&r.frame, a.max_width.unwrap_or(1280), a.background.as_deref() != Some("transparent"))?]))
+            Ok(CallToolResult::success(vec![
+                ContentBlock::text(info),
+                image_block(&r.frame, a.max_width.unwrap_or(1280), a.background.as_deref() != Some("transparent"))?,
+            ]))
         })
         .await
     }
 
-    #[tool(description = "Render many frames into one labeled contact sheet image — the fastest way to review an edit (count evenly spaced, explicit times, or on_beats).")]
+    #[tool(
+        description = "Render many frames into one labeled contact sheet image — the fastest way to review an edit (count evenly spaced, explicit times, or on_beats)."
+    )]
     async fn render_frames(&self, Parameters(a): Parameters<RenderFramesArgs>) -> Result<CallToolResult, McpError> {
         self.run(move |s| {
             let e = engine(s)?;
-            let comp = e.project.compositions.get(a.comp.as_deref().unwrap_or(&e.project.root)).cloned().ok_or_else(|| anyhow::anyhow!("comp not found"))?;
+            let comp = e
+                .project
+                .compositions
+                .get(a.comp.as_deref().unwrap_or(&e.project.root))
+                .cloned()
+                .ok_or_else(|| anyhow::anyhow!("comp not found"))?;
             let (t0, t1) = (a.start.unwrap_or(0.0), a.end.unwrap_or(comp.duration));
             let mut times = a.times.clone().unwrap_or_else(|| {
                 let n = a.count.unwrap_or(12).clamp(1, 48);
@@ -1222,7 +1332,10 @@ impl EditsServer {
         self.run(move |s| {
             let e = engine(s)?;
             let out = a.output.clone().unwrap_or_else(|| {
-                e.path.as_ref().map(|p| p.with_extension("").with_extension("preview.mp4").display().to_string()).unwrap_or_else(|| "preview.mp4".into())
+                e.path
+                    .as_ref()
+                    .map(|p| p.with_extension("").with_extension("preview.mp4").display().to_string())
+                    .unwrap_or_else(|| "preview.mp4".into())
             });
             let mut st = ExportSettings::new(out);
             st.quality = 45.0;
@@ -1236,7 +1349,9 @@ impl EditsServer {
         .await
     }
 
-    #[tool(description = "Export the final video. Codec from extension or `codec` (h264/h265/av1 with NVENC/AMF/QSV auto, prores, prores4444 alpha, vp9 alpha webm, gif, webp, apng, png_sequence) or audio-only (.mp3/.wav/.flac). quality 0-100, optional width/height/range.")]
+    #[tool(
+        description = "Export the final video. Codec from extension or `codec` (h264/h265/av1 with NVENC/AMF/QSV auto, prores, prores4444 alpha, vp9 alpha webm, gif, webp, apng, png_sequence) or audio-only (.mp3/.wav/.flac). quality 0-100, optional width/height/range."
+    )]
     async fn export(&self, Parameters(a): Parameters<ExportArgs>) -> Result<CallToolResult, McpError> {
         self.run(move |s| {
             let e = engine(s)?;
@@ -1250,7 +1365,9 @@ impl EditsServer {
         .await
     }
 
-    #[tool(description = "Validate the project: structure, missing files, unknown effects/params, broken expressions, custom shader/preset errors.")]
+    #[tool(
+        description = "Validate the project: structure, missing files, unknown effects/params, broken expressions, custom shader/preset errors."
+    )]
     async fn validate(&self) -> Result<CallToolResult, McpError> {
         self.run(|s| {
             let e = engine(s)?;
@@ -1272,7 +1389,9 @@ impl EditsServer {
         .await
     }
 
-    #[tool(description = "Documentation for agents. Topics: workflow, format, expressions, scripting, effects (WGSL authoring), presets, easings, blend_modes, tips.")]
+    #[tool(
+        description = "Documentation for agents. Topics: workflow, format, expressions, scripting, effects (WGSL authoring), presets, easings, blend_modes, tips."
+    )]
     async fn reference(&self, Parameters(a): Parameters<TopicArgs>) -> Result<CallToolResult, McpError> {
         Ok(match reference::topic(&a.topic) {
             Some(t) => text(t),
@@ -1280,7 +1399,9 @@ impl EditsServer {
         })
     }
 
-    #[tool(description = "JSON schema of the project file or a sub-type (clip, source, transform, effect, transition, mask, text, text_animator, shape, audio, audio_effect, asset, timing, easing, blend_mode, echo, marker, property).")]
+    #[tool(
+        description = "JSON schema of the project file or a sub-type (clip, source, transform, effect, transition, mask, text, text_animator, shape, audio, audio_effect, asset, timing, easing, blend_mode, echo, marker, property)."
+    )]
     async fn schema(&self, Parameters(a): Parameters<SchemaArgs>) -> Result<CallToolResult, McpError> {
         Ok(match edits_core::type_schema(&a.r#type) {
             Some(s) => text(serde_json::to_string(&s).unwrap_or_default()),

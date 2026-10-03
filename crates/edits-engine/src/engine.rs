@@ -11,7 +11,10 @@ use std::{
 use edits_audio::{AnalysisOptions, AudioAnalysis};
 use edits_core::{Asset, AssetKind, EditError, Project, history::History, validate::Issue};
 use edits_fx::Library;
-use edits_media::{Ffmpeg, Frame, scenes::{SceneOptions, Shot}};
+use edits_media::{
+    Ffmpeg, Frame,
+    scenes::{SceneOptions, Shot},
+};
 use edits_render::{GpuContext, GpuOptions, OutputMode, Renderer, TextRenderer};
 use serde::Serialize;
 use serde_json::{Value as Json, json};
@@ -93,7 +96,8 @@ pub(crate) struct EngineServices {
 impl ScriptServices for EngineServices {
     fn scenes(&self, project: &Project, asset: &str) -> std::result::Result<Json, String> {
         let a = project.assets.get(asset).ok_or_else(|| format!("asset '{asset}' not found"))?;
-        let shots = detect_scenes_cached(self.ff.as_ref(), &self.base_dir, &self.cache_dir, a, &SceneOptions::default()).map_err(|e| e.to_string())?;
+        let shots = detect_scenes_cached(self.ff.as_ref(), &self.base_dir, &self.cache_dir, a, &SceneOptions::default())
+            .map_err(|e| e.to_string())?;
         Ok(serde_json::to_value(&*shots).unwrap_or_default())
     }
     fn subtitles(&self, project: &Project, asset: &str) -> std::result::Result<Json, String> {
@@ -112,7 +116,12 @@ fn resolve(base: &Path, p: &str) -> PathBuf {
 
 fn file_key(path: &Path, extra: &str) -> String {
     let meta = std::fs::metadata(path).ok();
-    let mtime = meta.as_ref().and_then(|m| m.modified().ok()).and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_secs()).unwrap_or(0);
+    let mtime = meta
+        .as_ref()
+        .and_then(|m| m.modified().ok())
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
     let size = meta.map(|m| m.len()).unwrap_or(0);
     blake3::hash(format!("{}|{size}|{mtime}|{extra}", path.display()).as_bytes()).to_hex()[..20].to_string()
 }
@@ -121,10 +130,10 @@ fn detect_scenes_cached(ff: Option<&Ffmpeg>, base: &Path, cache: &Path, a: &Asse
     let p = resolve(base, &a.path);
     let key = file_key(&p, &serde_json::to_string(opts).unwrap_or_default());
     let cfile = cache.join(format!("scenes-{key}.json"));
-    if let Ok(s) = std::fs::read_to_string(&cfile) {
-        if let Ok(v) = serde_json::from_str::<Vec<Shot>>(&s) {
-            return Ok(Arc::new(v));
-        }
+    if let Ok(s) = std::fs::read_to_string(&cfile)
+        && let Ok(v) = serde_json::from_str::<Vec<Shot>>(&s)
+    {
+        return Ok(Arc::new(v));
     }
     if a.kind != AssetKind::Video {
         return Err(EngineError::Invalid(format!("scene detection needs a video asset ({:?} given)", a.kind)));
@@ -158,7 +167,8 @@ fn sanitize_id(stem: &str) -> String {
 
 impl Engine {
     pub fn new(project: Project, path: Option<PathBuf>) -> Engine {
-        let base = path.as_ref().and_then(|p| p.parent().map(|d| d.to_path_buf())).unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+        let base =
+            path.as_ref().and_then(|p| p.parent().map(|d| d.to_path_buf())).unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
         let ff = Ffmpeg::locate().ok();
         if ff.is_none() {
             tracing::warn!("FFmpeg not found: video/audio import and export are unavailable");
@@ -185,7 +195,8 @@ impl Engine {
 
     pub fn open(path: &Path) -> Result<Engine> {
         let text = std::fs::read_to_string(path).map_err(|e| EngineError::Invalid(format!("cannot read {}: {e}", path.display())))?;
-        let project: Project = serde_json::from_str(&text).map_err(|e| EngineError::Invalid(format!("invalid project file {}: {e}", path.display())))?;
+        let project: Project =
+            serde_json::from_str(&text).map_err(|e| EngineError::Invalid(format!("invalid project file {}: {e}", path.display())))?;
         let abs = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
         Ok(Engine::new(project, Some(abs)))
     }
@@ -195,10 +206,10 @@ impl Engine {
         if path.exists() {
             return Err(EngineError::Invalid(format!("{} already exists (open it instead)", path.display())));
         }
-        if let Some(d) = path.parent() {
-            if !d.as_os_str().is_empty() {
-                std::fs::create_dir_all(d)?;
-            }
+        if let Some(d) = path.parent()
+            && !d.as_os_str().is_empty()
+        {
+            std::fs::create_dir_all(d)?;
         }
         std::fs::write(path, serde_json::to_string_pretty(&project)?)?;
         let abs = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
@@ -380,7 +391,10 @@ impl Engine {
                                 }
                             } else {
                                 let name = e.file_name().and_then(|n| n.to_str()).unwrap_or("");
-                                let skip = name.ends_with(".edits.json") || name.ends_with(".json.tmp") || name.starts_with('.') || name.contains(".preview.");
+                                let skip = name.ends_with(".edits.json")
+                                    || name.ends_with(".json.tmp")
+                                    || name.starts_with('.')
+                                    || name.contains(".preview.");
                                 if !skip && edits_media::probe::guess_kind(&e.to_string_lossy()) != AssetKind::Auto {
                                     out.push(e);
                                 }
@@ -496,7 +510,13 @@ impl Engine {
     // ------------------------------------------------------------------------------------------
 
     /// Analyze music (cached on disk). With `apply`, writes beats/drops/sections into project timing.
-    pub fn analyze_audio(&mut self, asset_id: &str, opts: &AnalysisOptions, apply: bool, offset: Option<f64>) -> Result<Arc<AudioAnalysis>> {
+    pub fn analyze_audio(
+        &mut self,
+        asset_id: &str,
+        opts: &AnalysisOptions,
+        apply: bool,
+        offset: Option<f64>,
+    ) -> Result<Arc<AudioAnalysis>> {
         let a = self.project.assets.get(asset_id).cloned().ok_or_else(|| EngineError::NotFound(format!("asset '{asset_id}'")))?;
         let an = self.load_or_analyze(asset_id, &a, opts)?;
         if apply {
@@ -505,7 +525,9 @@ impl Engine {
                 let root = self.project.root.clone();
                 self.project
                     .all_clips()
-                    .filter(|(c, _, cl)| *c == root && matches!(&cl.source, edits_core::ClipSource::Media { asset, .. } if asset == asset_id))
+                    .filter(|(c, _, cl)| {
+                        *c == root && matches!(&cl.source, edits_core::ClipSource::Media { asset, .. } if asset == asset_id)
+                    })
                     .map(|(_, _, cl)| cl.start - cl.source_in)
                     .next()
                     .unwrap_or(0.0)
@@ -541,12 +563,12 @@ impl Engine {
             return Ok(an.clone());
         }
         let cfile = self.cache_dir().join(format!("audio-{key}.json"));
-        if let Ok(s) = std::fs::read_to_string(&cfile) {
-            if let Ok(an) = serde_json::from_str::<AudioAnalysis>(&s) {
-                let an = Arc::new(an);
-                self.analyses.insert(mem_key, an.clone());
-                return Ok(an);
-            }
+        if let Ok(s) = std::fs::read_to_string(&cfile)
+            && let Ok(an) = serde_json::from_str::<AudioAnalysis>(&s)
+        {
+            let an = Arc::new(an);
+            self.analyses.insert(mem_key, an.clone());
+            return Ok(an);
         }
         let buf = self.media.audio(a)?;
         let an = Arc::new(edits_audio::analyze(&buf, opts));
@@ -642,7 +664,14 @@ impl Engine {
     }
 
     /// Render directly into a texture view (zero-copy display in the viewer). Returns warnings.
-    pub fn render_to_view(&mut self, comp: Option<&str>, t: f64, view: &edits_render::wgpu::TextureView, format: edits_render::wgpu::TextureFormat, mode: OutputMode) -> Result<Vec<String>> {
+    pub fn render_to_view(
+        &mut self,
+        comp: Option<&str>,
+        t: f64,
+        view: &edits_render::wgpu::TextureView,
+        format: edits_render::wgpu::TextureFormat,
+        mode: OutputMode,
+    ) -> Result<Vec<String>> {
         let comp_id = comp.map(String::from).unwrap_or_else(|| self.project.root.clone());
         if !self.project.compositions.contains_key(&comp_id) {
             return Err(EngineError::NotFound(format!("composition '{comp_id}'")));
@@ -702,7 +731,11 @@ impl Engine {
         let mut sheet = image::RgbaImage::from_pixel(w, h, image::Rgba([24, 24, 28, 255]));
         let label_src = |s: &str| {
             let mut t = edits_core::TextSource::simple(s, (th as f64 / 9.0).clamp(10.0, 28.0));
-            t.background = Some(edits_core::TextBackground { color: edits_core::Color([0.0, 0.0, 0.0, 0.65]), padding: edits_core::Vec2::new(6.0, 2.0), radius: 3.0 });
+            t.background = Some(edits_core::TextBackground {
+                color: edits_core::Color([0.0, 0.0, 0.0, 0.65]),
+                padding: edits_core::Vec2::new(6.0, 2.0),
+                radius: 3.0,
+            });
             t.weight = 600;
             t
         };
@@ -712,7 +745,10 @@ impl Engine {
             let (x, y) = (gap + (i % cols) as u32 * (tw + gap), gap + (i / cols) as u32 * (th + gap));
             image::imageops::overlay(&mut sheet, &small, x as i64, y as i64);
             if let Some(l) = labels.get(i) {
-                let lf = self.text.render(&label_src(l), &edits_render::TextFrameParams { color: edits_core::Color::WHITE, letter_spacing: 0.0, time: 0.0, duration: 1.0 });
+                let lf = self.text.render(
+                    &label_src(l),
+                    &edits_render::TextFrameParams { color: edits_core::Color::WHITE, letter_spacing: 0.0, time: 0.0, duration: 1.0 },
+                );
                 if let Some(limg) = image::RgbaImage::from_raw(lf.width, lf.height, lf.data) {
                     image::imageops::overlay(&mut sheet, &limg, x as i64 - 4, y as i64 - 4);
                 }
@@ -729,7 +765,9 @@ impl Engine {
         let mut frames = vec![];
         for t in times {
             let f = match a.kind {
-                AssetKind::Video => edits_media::video::grab_frame(self.media.ffmpeg()?, &self.media.resolve(&a.path), *t, thumb_width, th.max(2))?,
+                AssetKind::Video => {
+                    edits_media::video::grab_frame(self.media.ffmpeg()?, &self.media.resolve(&a.path), *t, thumb_width, th.max(2))?
+                }
                 _ => (*self.media.visual(&a, *t, (thumb_width, th), None)?.frame).clone(),
             };
             frames.push(f);
@@ -802,7 +840,13 @@ impl Engine {
 
     /// Render an effect on a frame of the edit (or a test card if the project is empty), so an
     /// agent can see what it does before using it. Transitions are shown at `progress`.
-    pub fn preview_effect(&mut self, effect: &str, params: &serde_json::Map<String, Json>, time: Option<f64>, progress: f64) -> Result<Frame> {
+    pub fn preview_effect(
+        &mut self,
+        effect: &str,
+        params: &serde_json::Map<String, Json>,
+        time: Option<f64>,
+        progress: f64,
+    ) -> Result<Frame> {
         let lib = self.library();
         let def = lib.effect(effect).cloned().ok_or_else(|| EngineError::NotFound(format!("effect '{effect}'")))?;
         let comp = self.project.root_comp().cloned().ok_or_else(|| EngineError::NotFound("root composition".into()))?;
@@ -854,7 +898,13 @@ impl Engine {
     // Presets & scripts
     // ------------------------------------------------------------------------------------------
 
-    pub fn apply_preset(&mut self, preset: &str, target: Option<&str>, args: &serde_json::Map<String, Json>, at: Option<f64>) -> Result<ScriptReport> {
+    pub fn apply_preset(
+        &mut self,
+        preset: &str,
+        target: Option<&str>,
+        args: &serde_json::Map<String, Json>,
+        at: Option<f64>,
+    ) -> Result<ScriptReport> {
         let lib = self.library();
         let def = lib.preset(preset).cloned().ok_or_else(|| EngineError::NotFound(format!("preset '{preset}' (see presets_list)")))?;
         let out = script::run_preset(self.project.clone(), lib, self.services(), &def, target, args, at, 0, 0)?;
@@ -905,14 +955,26 @@ impl Engine {
         let check_fx = |issues: &mut Vec<Issue>, list: &[edits_core::EffectInstance], owner: &str| {
             for e in list {
                 match lib.effect(&e.effect) {
-                    None => issues.push(Issue { severity: Severity::Error, object: Some(owner.into()), message: format!("unknown effect '{}'", e.effect) }),
+                    None => issues.push(Issue {
+                        severity: Severity::Error,
+                        object: Some(owner.into()),
+                        message: format!("unknown effect '{}'", e.effect),
+                    }),
                     Some(d) => {
                         if d.kind != edits_fx::EffectKind::Filter {
-                            issues.push(Issue { severity: Severity::Error, object: Some(owner.into()), message: format!("'{}' is a {}, not a filter", d.id, d.kind.as_str()) });
+                            issues.push(Issue {
+                                severity: Severity::Error,
+                                object: Some(owner.into()),
+                                message: format!("'{}' is a {}, not a filter", d.id, d.kind.as_str()),
+                            });
                         }
                         for k in e.params.keys() {
                             if d.param(k).is_none() {
-                                issues.push(Issue { severity: Severity::Warning, object: Some(e.id.clone()), message: format!("effect '{}' has no param '{k}'", d.id) });
+                                issues.push(Issue {
+                                    severity: Severity::Warning,
+                                    object: Some(e.id.clone()),
+                                    message: format!("effect '{}' has no param '{k}'", d.id),
+                                });
                             }
                         }
                     }
@@ -925,15 +987,15 @@ impl Engine {
                 check_fx(&mut issues, &t.effects, &t.id);
                 for c in &t.clips {
                     check_fx(&mut issues, &c.effects, &c.id);
-                    if let Some(tr) = &c.transition_in {
-                        if lib.effect(&tr.effect).map(|d| d.kind) != Some(edits_fx::EffectKind::Transition) {
-                            push(&mut issues, Severity::Error, Some(&c.id), format!("unknown transition '{}'", tr.effect));
-                        }
+                    if let Some(tr) = &c.transition_in
+                        && lib.effect(&tr.effect).map(|d| d.kind) != Some(edits_fx::EffectKind::Transition)
+                    {
+                        push(&mut issues, Severity::Error, Some(&c.id), format!("unknown transition '{}'", tr.effect));
                     }
-                    if let edits_core::ClipSource::Generator { effect, .. } = &c.source {
-                        if lib.effect(effect).map(|d| d.kind) != Some(edits_fx::EffectKind::Generator) {
-                            push(&mut issues, Severity::Error, Some(&c.id), format!("unknown generator '{effect}'"));
-                        }
+                    if let edits_core::ClipSource::Generator { effect, .. } = &c.source
+                        && lib.effect(effect).map(|d| d.kind) != Some(edits_fx::EffectKind::Generator)
+                    {
+                        push(&mut issues, Severity::Error, Some(&c.id), format!("unknown generator '{effect}'"));
                     }
                 }
             }
@@ -978,9 +1040,9 @@ pub fn test_card(w: u32, h: u32) -> Frame {
             let ring = ((r * 40.0).sin() * 0.5 + 0.5) * (1.0 - (r * 2.2).min(1.0));
             let checker = (((x / 32) + (y / 32)) % 2) as f32;
             let col = [
-                (0.5 + 0.5 * (u * 6.28).sin()) * 0.8 + ring * 0.6,
-                (0.5 + 0.5 * (v * 6.28 + 2.0).sin()) * 0.7 + checker * 0.1,
-                (0.5 + 0.5 * ((u + v) * 6.28 + 4.0).sin()) * 0.9 + ring * 0.3,
+                (0.5 + 0.5 * (u * std::f32::consts::TAU).sin()) * 0.8 + ring * 0.6,
+                (0.5 + 0.5 * (v * std::f32::consts::TAU + 2.0).sin()) * 0.7 + checker * 0.1,
+                (0.5 + 0.5 * ((u + v) * std::f32::consts::TAU + 4.0).sin()) * 0.9 + ring * 0.3,
             ];
             d.extend(col.iter().map(|c| (c.clamp(0.0, 1.0) * 255.0) as u8));
             d.push(255);

@@ -17,7 +17,21 @@ fn make_video(ff: &Ffmpeg, path: &Path) {
         .cmd()
         .args(["-y", "-f", "lavfi", "-i", "color=c=red:s=160x90:r=24:d=2", "-f", "lavfi", "-i", "color=c=blue:s=160x90:r=24:d=2"])
         .args(["-f", "lavfi", "-i", "sine=frequency=440:duration=4"])
-        .args(["-filter_complex", "[0:v][1:v]concat=n=2:v=1:a=0[v]", "-map", "[v]", "-map", "2:a", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest"])
+        .args([
+            "-filter_complex",
+            "[0:v][1:v]concat=n=2:v=1:a=0[v]",
+            "-map",
+            "[v]",
+            "-map",
+            "2:a",
+            "-c:v",
+            "libx264",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "aac",
+            "-shortest",
+        ])
         .arg(path)
         .status()
         .unwrap();
@@ -40,7 +54,8 @@ fn decode_seek_scenes_encode() {
     assert!(info.has_audio);
     assert!((info.fps.unwrap() - 24.0).abs() < 0.01);
 
-    let mut r = VideoReader::open(&ff, &v, (160, 90), 24.0, info.duration.unwrap(), VideoOptions { size: None, fps: None, hwaccel: None }).unwrap();
+    let mut r =
+        VideoReader::open(&ff, &v, (160, 90), 24.0, info.duration.unwrap(), VideoOptions { size: None, fps: None, hwaccel: None }).unwrap();
     let f0 = r.frame_at(0.5).unwrap();
     assert!(f0.data[0] > 200 && f0.data[2] < 50, "expected red, got {:?}", &f0.data[..4]);
     let f1 = r.frame_at(3.0).unwrap();
@@ -66,7 +81,8 @@ fn decode_seek_scenes_encode() {
 
     let out = dir.path().join("out.mp4");
     let settings = ExportSettings::new(out.to_string_lossy());
-    let mut enc = Encoder::start(&ff, EncoderConfig { settings: &settings, width: 64, height: 32, fps: 24.0, audio_wav: Some(wav) }).unwrap();
+    let mut enc =
+        Encoder::start(&ff, EncoderConfig { settings: &settings, width: 64, height: 32, fps: 24.0, audio_wav: Some(wav) }).unwrap();
     for i in 0..24u8 {
         enc.push(vec![i.wrapping_mul(10); 64 * 32 * 4]).unwrap();
     }

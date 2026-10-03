@@ -6,9 +6,9 @@
 
 use std::{
     collections::{HashMap, HashSet},
-    sync::Arc,
     path::{Path, PathBuf},
     process::{Command, Stdio},
+    sync::Arc,
 };
 
 use crate::{MediaError, Result};
@@ -50,12 +50,12 @@ fn candidates() -> Vec<PathBuf> {
     if let Ok(d) = std::env::var("EDITS_FFMPEG_DIR") {
         v.push(PathBuf::from(d).join(format!("ffmpeg{EXE}")));
     }
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
-            v.push(dir.join(format!("ffmpeg{EXE}")));
-            v.push(dir.join("ffmpeg").join("bin").join(format!("ffmpeg{EXE}")));
-            v.push(dir.join("ffmpeg").join(format!("ffmpeg{EXE}")));
-        }
+    if let Ok(exe) = std::env::current_exe()
+        && let Some(dir) = exe.parent()
+    {
+        v.push(dir.join(format!("ffmpeg{EXE}")));
+        v.push(dir.join("ffmpeg").join("bin").join(format!("ffmpeg{EXE}")));
+        v.push(dir.join("ffmpeg").join(format!("ffmpeg{EXE}")));
     }
     if let Ok(p) = which::which("ffmpeg") {
         v.push(p);
@@ -85,10 +85,10 @@ impl Ffmpeg {
     /// Windows install locations (winget, scoop, chocolatey, C:\ffmpeg).
     pub fn locate() -> Result<Ffmpeg> {
         for c in candidates() {
-            if c.is_file() {
-                if let Ok(f) = Ffmpeg::from_path(&c) {
-                    return Ok(f);
-                }
+            if c.is_file()
+                && let Ok(f) = Ffmpeg::from_path(&c)
+            {
+                return Ok(f);
             }
         }
         Err(MediaError::FfmpegMissing)
@@ -105,34 +105,18 @@ impl Ffmpeg {
             return Err(MediaError::FfmpegMissing);
         }
         let version = String::from_utf8_lossy(&out.stdout).lines().next().unwrap_or("").to_string();
-        let enc = command(ffmpeg)
-            .args(["-hide_banner", "-encoders"])
-            .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .output()?;
+        let enc = command(ffmpeg).args(["-hide_banner", "-encoders"]).stdout(Stdio::piped()).stderr(Stdio::null()).output()?;
         let encoders = String::from_utf8_lossy(&enc.stdout)
             .lines()
             .filter_map(|l| {
                 let mut it = l.split_whitespace();
                 let flags = it.next()?;
-                if flags.len() == 6 && (flags.starts_with('V') || flags.starts_with('A')) {
-                    it.next().map(String::from)
-                } else {
-                    None
-                }
+                if flags.len() == 6 && (flags.starts_with('V') || flags.starts_with('A')) { it.next().map(String::from) } else { None }
             })
             .collect();
-        let hw = command(ffmpeg)
-            .args(["-hide_banner", "-hwaccels"])
-            .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .output()?;
-        let hwaccels = String::from_utf8_lossy(&hw.stdout)
-            .lines()
-            .skip(1)
-            .map(|l| l.trim().to_string())
-            .filter(|l| !l.is_empty())
-            .collect();
+        let hw = command(ffmpeg).args(["-hide_banner", "-hwaccels"]).stdout(Stdio::piped()).stderr(Stdio::null()).output()?;
+        let hwaccels =
+            String::from_utf8_lossy(&hw.stdout).lines().skip(1).map(|l| l.trim().to_string()).filter(|l| !l.is_empty()).collect();
         Ok(Ffmpeg { ffmpeg: ffmpeg.to_path_buf(), ffprobe, version, encoders, hwaccels, tested: Default::default() })
     }
 

@@ -128,12 +128,7 @@ impl ParamDef {
             ParamType::Color => {
                 let c = v.as_color().or_else(|| self.default.as_color()).unwrap_or(Color::WHITE);
                 let [r, g, b, a] = c.0;
-                [
-                    edits_core::color::srgb_to_linear(r),
-                    edits_core::color::srgb_to_linear(g),
-                    edits_core::color::srgb_to_linear(b),
-                    a,
-                ]
+                [edits_core::color::srgb_to_linear(r), edits_core::color::srgb_to_linear(g), edits_core::color::srgb_to_linear(b), a]
             }
             ParamType::Image | ParamType::Lut | ParamType::String => [0.0; 4],
         }
@@ -403,10 +398,7 @@ impl EffectDef {
 
     /// Default values as a map.
     pub fn defaults(&self) -> serde_json::Map<String, serde_json::Value> {
-        self.params
-            .iter()
-            .map(|p| (p.name.clone(), serde_json::to_value(&p.default).unwrap_or_default()))
-            .collect()
+        self.params.iter().map(|p| (p.name.clone(), serde_json::to_value(&p.default).unwrap_or_default())).collect()
     }
 }
 

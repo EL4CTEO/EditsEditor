@@ -9,10 +9,36 @@ fn make_media(dir: &Path) -> bool {
     let Ok(ff) = edits_media::Ffmpeg::locate() else { return false };
     let ok = |args: &[&str], out: &Path| ff.cmd().arg("-y").args(args).arg(out).status().map(|s| s.success()).unwrap_or(false);
     // footage with 3 hard cuts (scene detection) and a moving pattern
-    ok(&["-f", "lavfi", "-i", "testsrc2=s=320x180:r=24:d=2", "-f", "lavfi", "-i", "mandelbrot=s=320x180:r=24", "-f", "lavfi", "-i", "smptebars=s=320x180:r=24:d=2",
-        "-filter_complex", "[1:v]trim=duration=2,setpts=PTS-STARTPTS[m];[0:v][m][2:v]concat=n=3:v=1:a=0[v]", "-map", "[v]", "-c:v", "libx264", "-pix_fmt", "yuv420p"], &dir.join("footage.mp4"))
-        && ok(&["-f", "lavfi", "-i", "aevalsrc='0.9*sin(2*PI*55*t)*exp(-25*mod(t,0.5))*(1+2*gte(t,6))':s=48000:d=12"], &dir.join("song.wav"))
-        && std::fs::write(dir.join("words.srt"), "1\n00:00:01,000 --> 00:00:02,500\nhello there\n\n2\n00:00:03,000 --> 00:00:04,000\nsecond line\n").is_ok()
+    ok(
+        &[
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=s=320x180:r=24:d=2",
+            "-f",
+            "lavfi",
+            "-i",
+            "mandelbrot=s=320x180:r=24",
+            "-f",
+            "lavfi",
+            "-i",
+            "smptebars=s=320x180:r=24:d=2",
+            "-filter_complex",
+            "[1:v]trim=duration=2,setpts=PTS-STARTPTS[m];[0:v][m][2:v]concat=n=3:v=1:a=0[v]",
+            "-map",
+            "[v]",
+            "-c:v",
+            "libx264",
+            "-pix_fmt",
+            "yuv420p",
+        ],
+        &dir.join("footage.mp4"),
+    ) && ok(&["-f", "lavfi", "-i", "aevalsrc='0.9*sin(2*PI*55*t)*exp(-25*mod(t,0.5))*(1+2*gte(t,6))':s=48000:d=12"], &dir.join("song.wav"))
+        && std::fs::write(
+            dir.join("words.srt"),
+            "1\n00:00:01,000 --> 00:00:02,500\nhello there\n\n2\n00:00:03,000 --> 00:00:04,000\nsecond line\n",
+        )
+        .is_ok()
 }
 
 fn base(dir: &Path) -> Option<Engine> {
@@ -25,7 +51,10 @@ fn base(dir: &Path) -> Option<Engine> {
         return None;
     }
     e.import(&[dir.to_string_lossy().to_string()], &ImportOptions::default()).unwrap();
-    e.mutate("music", |p| ops::add_clip(p, None, ops::TrackTarget::New, json!({"start": 0, "duration": 6, "source": {"type": "media", "asset": "song"}}))).unwrap();
+    e.mutate("music", |p| {
+        ops::add_clip(p, None, ops::TrackTarget::New, json!({"start": 0, "duration": 6, "source": {"type": "media", "asset": "song"}}))
+    })
+    .unwrap();
     e.analyze_audio("song", &AnalysisOptions::default(), true, None).unwrap();
     // make sure there's at least one drop for drop-based presets
     e.mutate("drop", |p| {
@@ -76,7 +105,15 @@ fn every_preset_applies_and_renders() {
                         args.insert("lyrics".into(), json!("words"));
                     }
                     "apply_to_all" => {
-                        e.mutate("clip", |p| ops::add_clip(p, None, ops::TrackTarget::New, json!({"start": 0, "duration": 2, "source": {"type": "media", "asset": "footage"}}))).unwrap();
+                        e.mutate("clip", |p| {
+                            ops::add_clip(
+                                p,
+                                None,
+                                ops::TrackTarget::New,
+                                json!({"start": 0, "duration": 2, "source": {"type": "media", "asset": "footage"}}),
+                            )
+                        })
+                        .unwrap();
                     }
                     _ => {}
                 }
@@ -87,7 +124,12 @@ fn every_preset_applies_and_renders() {
         match r {
             Err(err) => failures.push(format!("{}: apply failed: {err}", def.id)),
             Ok(rep) => {
-                let errs: Vec<String> = e.validate().into_iter().filter(|i| i.severity == Severity::Error).map(|i| format!("{:?} {}", i.object, i.message)).collect();
+                let errs: Vec<String> = e
+                    .validate()
+                    .into_iter()
+                    .filter(|i| i.severity == Severity::Error)
+                    .map(|i| format!("{:?} {}", i.object, i.message))
+                    .collect();
                 if !errs.is_empty() {
                     failures.push(format!("{}: invalid project: {errs:?}", def.id));
                     continue;

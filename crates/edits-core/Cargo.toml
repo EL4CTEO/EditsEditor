@@ -13,3 +13,6 @@ schemars.workspace = true
 indexmap.workspace = true
 thiserror.workspace = true
 json-patch.workspace = true
+
+[lints]
+workspace = true

@@ -388,17 +388,7 @@ pub fn analyze(buf: &AudioBuffer, opts: &AnalysisOptions) -> AudioAnalysis {
         bands: env_bands.iter().map(|b| b.map(|v| (v * 1000.0).round() / 1000.0)).collect(),
         onset: onset_env.iter().map(|v| (v * 1000.0).round() / 1000.0).collect(),
     };
-    AudioAnalysis {
-        duration,
-        bpm: (bpm * 100.0).round() / 100.0,
-        tempo_confidence,
-        beats,
-        downbeats,
-        drops,
-        accents,
-        sections,
-        envelope,
-    }
+    AudioAnalysis { duration, bpm: (bpm * 100.0).round() / 100.0, tempo_confidence, beats, downbeats, drops, accents, sections, envelope }
 }
 
 fn round3(t: f64) -> f64 {
@@ -420,7 +410,15 @@ fn sections_from(downbeats: &[f64], duration: f64, drops: &[f64], energy: impl F
     let q = |p: f64| es[((es.len() - 1) as f64 * p) as usize];
     let (q1, q2) = (q(0.33), q(0.7));
     let emax = es.last().copied().unwrap_or(1.0).max(1e-6);
-    let level = |e: f64| if e >= q2 { 2 } else if e >= q1 { 1 } else { 0 };
+    let level = |e: f64| {
+        if e >= q2 {
+            2
+        } else if e >= q1 {
+            1
+        } else {
+            0
+        }
+    };
     // merge runs of equal level
     let mut runs: Vec<(f64, f64, i32, f64, usize)> = vec![];
     for (a, b, e) in segs {
@@ -437,13 +435,13 @@ fn sections_from(downbeats: &[f64], duration: f64, drops: &[f64], energy: impl F
     // absorb single short runs into the previous one
     let mut merged: Vec<(f64, f64, i32, f64, usize)> = vec![];
     for r in runs {
-        if let Some(last) = merged.last_mut() {
-            if r.1 - r.0 < 4.0 {
-                last.1 = r.1;
-                last.3 += r.3;
-                last.4 += r.4;
-                continue;
-            }
+        if let Some(last) = merged.last_mut()
+            && r.1 - r.0 < 4.0
+        {
+            last.1 = r.1;
+            last.3 += r.3;
+            last.4 += r.4;
+            continue;
         }
         merged.push(r);
     }
@@ -490,7 +488,7 @@ mod tests {
             if t0 >= seconds {
                 break;
             }
-            let accent = if k % 4 == 0 { 1.0 } else { 0.5 };
+            let accent = if k.is_multiple_of(4) { 1.0 } else { 0.5 };
             let start = (t0 * sr) as usize;
             for i in 0..2400 {
                 if start + i >= n {

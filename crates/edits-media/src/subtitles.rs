@@ -138,7 +138,9 @@ fn parse_ass(text: &str) -> Vec<Cue> {
             let parts: Vec<&str> = d.splitn(n, ',').collect();
             let idx = |name: &str, def: usize| fields.iter().position(|f| f == name).unwrap_or(def);
             let (si, ei, ti) = (idx("start", 1), idx("end", 2), idx("text", n - 1));
-            let (Some(s), Some(e)) = (parts.get(si).and_then(|x| parse_clock(x)), parts.get(ei).and_then(|x| parse_clock(x))) else { continue };
+            let (Some(s), Some(e)) = (parts.get(si).and_then(|x| parse_clock(x)), parts.get(ei).and_then(|x| parse_clock(x))) else {
+                continue;
+            };
             let raw = parts.get(ti).copied().unwrap_or("");
             // karaoke \k timings (centiseconds)
             let mut words = vec![];

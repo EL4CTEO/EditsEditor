@@ -72,9 +72,28 @@ pub fn type_schema(name: &str) -> Option<serde_json::Value> {
 }
 
 pub const SCHEMA_TYPES: &[&str] = &[
-    "project", "composition", "track", "clip", "source", "transform", "effect", "transition", "mask", "matte",
-    "text", "text_animator", "shape", "audio", "audio_effect", "asset", "timing", "easing", "blend_mode", "echo",
-    "marker", "property",
+    "project",
+    "composition",
+    "track",
+    "clip",
+    "source",
+    "transform",
+    "effect",
+    "transition",
+    "mask",
+    "matte",
+    "text",
+    "text_animator",
+    "shape",
+    "audio",
+    "audio_effect",
+    "asset",
+    "timing",
+    "easing",
+    "blend_mode",
+    "echo",
+    "marker",
+    "property",
 ];
 
 #[cfg(test)]

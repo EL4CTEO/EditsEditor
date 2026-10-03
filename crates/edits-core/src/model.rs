@@ -9,13 +9,7 @@ use indexmap::IndexMap;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    color::Color,
-    easing::Easing,
-    math::Vec2,
-    property::Property,
-    value::Value,
-};
+use crate::{color::Color, easing::Easing, math::Vec2, property::Property, value::Value};
 
 pub const FORMAT_VERSION: u32 = 1;
 
@@ -494,11 +488,8 @@ impl Clip {
         if let Some(f) = self.freeze {
             return f;
         }
-        let raw = if let Some(remap) = &self.time_remap {
-            remap.sample(local, &local)
-        } else {
-            self.source_in + self.integrate_speed(local)
-        };
+        let raw =
+            if let Some(remap) = &self.time_remap { remap.sample(local, &local) } else { self.source_in + self.integrate_speed(local) };
         if self.reverse {
             let total = self.source_in + self.integrate_speed(self.duration);
             let end = media_duration.map(|d| d.min(total)).unwrap_or(total);
@@ -720,14 +711,7 @@ pub struct EffectInstance {
 
 impl EffectInstance {
     pub fn new(id: impl Into<String>, effect: impl Into<String>) -> Self {
-        EffectInstance {
-            id: id.into(),
-            effect: effect.into(),
-            enabled: true,
-            params: IndexMap::new(),
-            mix: one_prop(),
-            range: None,
-        }
+        EffectInstance { id: id.into(), effect: effect.into(), enabled: true, params: IndexMap::new(), mix: one_prop(), range: None }
     }
 
     pub fn with(mut self, name: &str, v: impl Into<Property<Value>>) -> Self {
@@ -895,14 +879,7 @@ pub struct ClipAudio {
 
 impl Default for ClipAudio {
     fn default() -> Self {
-        ClipAudio {
-            volume: one_prop(),
-            pan: zero_prop(),
-            mute: false,
-            fade_in: 0.0,
-            fade_out: 0.0,
-            effects: vec![],
-        }
+        ClipAudio { volume: one_prop(), pan: zero_prop(), mute: false, fade_in: 0.0, fade_out: 0.0, effects: vec![] }
     }
 }
 
@@ -1234,19 +1211,32 @@ pub enum ShapeKind {
         #[serde(default)]
         radius: f64,
     },
-    Ellipse { size: Vec2 },
+    Ellipse {
+        size: Vec2,
+    },
     /// Regular polygon (triangle = 3, hexagon = 6...).
-    Polygon { sides: u32, radius: f64 },
+    Polygon {
+        sides: u32,
+        radius: f64,
+    },
     Star {
         points: u32,
         outer_radius: f64,
         inner_radius: f64,
     },
-    Line { from: Vec2, to: Vec2 },
+    Line {
+        from: Vec2,
+        to: Vec2,
+    },
     /// Ring / donut.
-    Ring { outer_radius: f64, inner_radius: f64 },
+    Ring {
+        outer_radius: f64,
+        inner_radius: f64,
+    },
     /// SVG path data in local pixels (centered at 0,0).
-    Path { d: String },
+    Path {
+        d: String,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]

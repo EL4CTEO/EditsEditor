@@ -9,9 +9,8 @@ use crate::{MediaError, Result, ffmpeg::Ffmpeg, image_io, sequence::ImageSequenc
 
 pub const IMAGE_EXT: &[&str] =
     &["png", "jpg", "jpeg", "webp", "bmp", "tif", "tiff", "tga", "ico", "hdr", "exr", "qoi", "pnm", "ppm", "pgm", "dds", "avif"];
-pub const VIDEO_EXT: &[&str] = &[
-    "mp4", "mkv", "mov", "avi", "webm", "m4v", "flv", "wmv", "ts", "m2ts", "mts", "mpg", "mpeg", "3gp", "ogv", "mxf", "vob",
-];
+pub const VIDEO_EXT: &[&str] =
+    &["mp4", "mkv", "mov", "avi", "webm", "m4v", "flv", "wmv", "ts", "m2ts", "mts", "mpg", "mpeg", "3gp", "ogv", "mxf", "vob"];
 pub const AUDIO_EXT: &[&str] = &["mp3", "wav", "flac", "ogg", "opus", "m4a", "aac", "wma", "aiff", "aif", "alac", "mka"];
 pub const FONT_EXT: &[&str] = &["ttf", "otf", "ttc", "otc"];
 pub const SUB_EXT: &[&str] = &["lrc", "srt", "vtt", "ass", "ssa"];
@@ -60,17 +59,9 @@ fn parse_rate(s: &str) -> Option<f64> {
 
 /// Probe a file with ffprobe.
 pub fn ffprobe(ff: &Ffmpeg, path: &Path) -> Result<(MediaInfo, Value)> {
-    let out = ff
-        .probe_cmd()
-        .args(["-v", "error", "-print_format", "json", "-show_format", "-show_streams"])
-        .arg(path)
-        .output()?;
+    let out = ff.probe_cmd().args(["-v", "error", "-print_format", "json", "-show_format", "-show_streams"]).arg(path).output()?;
     if !out.status.success() {
-        return Err(MediaError::Probe(format!(
-            "{}: {}",
-            path.display(),
-            String::from_utf8_lossy(&out.stderr).trim()
-        )));
+        return Err(MediaError::Probe(format!("{}: {}", path.display(), String::from_utf8_lossy(&out.stderr).trim())));
     }
     let v: Value = serde_json::from_slice(&out.stdout).map_err(|e| MediaError::Probe(e.to_string()))?;
     let mut info = MediaInfo::default();
@@ -91,14 +82,17 @@ pub fn ffprobe(ff: &Ffmpeg, path: &Path) -> Result<(MediaInfo, Value)> {
                 if (rot.abs() - 90.0).abs() < 1.0 || (rot.abs() - 270.0).abs() < 1.0 {
                     std::mem::swap(&mut info.width, &mut info.height);
                 }
-                info.fps = s["avg_frame_rate"]
-                    .as_str()
-                    .and_then(parse_rate)
-                    .or_else(|| s["r_frame_rate"].as_str().and_then(parse_rate));
+                info.fps = s["avg_frame_rate"].as_str().and_then(parse_rate).or_else(|| s["r_frame_rate"].as_str().and_then(parse_rate));
                 info.video_codec = s["codec_name"].as_str().map(String::from);
                 info.frames = s["nb_frames"].as_str().and_then(|n| n.parse().ok());
                 let pix = s["pix_fmt"].as_str().unwrap_or("");
-                info.has_alpha = pix.contains('a') && (pix.starts_with("yuva") || pix.starts_with("rgba") || pix.starts_with("argb") || pix.starts_with("bgra") || pix.starts_with("gbrap") || pix == "pal8");
+                info.has_alpha = pix.contains('a')
+                    && (pix.starts_with("yuva")
+                        || pix.starts_with("rgba")
+                        || pix.starts_with("argb")
+                        || pix.starts_with("bgra")
+                        || pix.starts_with("gbrap")
+                        || pix == "pal8");
             }
             Some("audio") if !info.has_audio => {
                 info.has_audio = true;

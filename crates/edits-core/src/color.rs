@@ -57,12 +57,7 @@ impl Color {
                 return None;
             }
             let a = v.get(3).copied().unwrap_or(1.0);
-            return Some(Color([
-                (v[0] / 255.0) as f32,
-                (v[1] / 255.0) as f32,
-                (v[2] / 255.0) as f32,
-                a as f32,
-            ]));
+            return Some(Color([(v[0] / 255.0) as f32, (v[1] / 255.0) as f32, (v[2] / 255.0) as f32, a as f32]));
         }
         if let Some(args) = func_args(&lower, "hsla").or_else(|| func_args(&lower, "hsl")) {
             let v = parse_numbers(args)?;
@@ -80,15 +75,14 @@ impl Color {
         if v.len() < 3 {
             return None;
         }
-        let scale = if v.iter().take(3).any(|c| *c > 1.0 + 1e-6) && v.iter().take(3).all(|c| *c >= 0.0 && *c <= 255.0 && c.fract() == 0.0) { 255.0 } else { 1.0 };
+        let scale = if v.iter().take(3).any(|c| *c > 1.0 + 1e-6) && v.iter().take(3).all(|c| *c >= 0.0 && *c <= 255.0 && c.fract() == 0.0) {
+            255.0
+        } else {
+            1.0
+        };
         let a = v.get(3).copied().unwrap_or(1.0);
         let a = if scale == 255.0 && a > 1.0 { a / 255.0 } else { a };
-        Some(Color([
-            (v[0] / scale) as f32,
-            (v[1] / scale) as f32,
-            (v[2] / scale) as f32,
-            a as f32,
-        ]))
+        Some(Color([(v[0] / scale) as f32, (v[1] / scale) as f32, (v[2] / scale) as f32, a as f32]))
     }
 
     pub fn lerp(&self, o: &Color, t: f64) -> Color {
@@ -118,11 +112,7 @@ fn parse_numbers(args: &str) -> Option<Vec<f64>> {
         .filter(|p| !p.is_empty())
         .map(|p| {
             let p = p.trim();
-            if let Some(pct) = p.strip_suffix('%') {
-                pct.parse::<f64>().ok()
-            } else {
-                p.trim_end_matches("deg").parse::<f64>().ok()
-            }
+            if let Some(pct) = p.strip_suffix('%') { pct.parse::<f64>().ok() } else { p.trim_end_matches("deg").parse::<f64>().ok() }
         })
         .collect()
 }
@@ -151,20 +141,12 @@ fn hsl_to_rgb(h: f64, s: f64, l: f64) -> (f64, f64, f64) {
 
 fn parse_hex(hex: &str) -> Option<Color> {
     let hex = hex.trim_start_matches('#');
-    let digits: Vec<u8> = hex
-        .chars()
-        .map(|c| c.to_digit(16).map(|d| d as u8))
-        .collect::<Option<Vec<_>>>()?;
+    let digits: Vec<u8> = hex.chars().map(|c| c.to_digit(16).map(|d| d as u8)).collect::<Option<Vec<_>>>()?;
     let (r, g, b, a) = match digits.len() {
         3 => (digits[0] * 17, digits[1] * 17, digits[2] * 17, 255),
         4 => (digits[0] * 17, digits[1] * 17, digits[2] * 17, digits[3] * 17),
         6 => (digits[0] * 16 + digits[1], digits[2] * 16 + digits[3], digits[4] * 16 + digits[5], 255),
-        8 => (
-            digits[0] * 16 + digits[1],
-            digits[2] * 16 + digits[3],
-            digits[4] * 16 + digits[5],
-            digits[6] * 16 + digits[7],
-        ),
+        8 => (digits[0] * 16 + digits[1], digits[2] * 16 + digits[3], digits[4] * 16 + digits[5], digits[6] * 16 + digits[7]),
         _ => return None,
     };
     Some(Color([r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0, a as f32 / 255.0]))
@@ -222,11 +204,7 @@ impl Color {
 
 impl Serialize for Color {
     fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
-        if self.is_8bit() {
-            s.serialize_str(&self.to_hex())
-        } else {
-            self.0.serialize(s)
-        }
+        if self.is_8bit() { s.serialize_str(&self.to_hex()) } else { self.0.serialize(s) }
     }
 }
 

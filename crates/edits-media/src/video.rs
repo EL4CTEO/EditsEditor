@@ -140,10 +140,10 @@ impl VideoReader {
                     self.stats.frames_decoded += 1;
                     let frame = Arc::new(Frame::new(self.width, self.height, buf, false));
                     // keep only recent frames; recycle evicted buffers
-                    if let Some((_, old)) = self.cache.push(cur, frame.clone()) {
-                        if let Ok(old) = Arc::try_unwrap(old) {
-                            let _ = self.stream.as_ref().unwrap().recycle.try_send(old.data);
-                        }
+                    if let Some((_, old)) = self.cache.push(cur, frame.clone())
+                        && let Ok(old) = Arc::try_unwrap(old)
+                    {
+                        let _ = self.stream.as_ref().unwrap().recycle.try_send(old.data);
                     }
                     if cur >= idx {
                         return Ok(frame);
@@ -177,10 +177,7 @@ impl VideoReader {
             cmd.args(["-ss", &format!("{t:.6}")]);
         }
         cmd.arg("-i").arg(&self.path);
-        let vf = format!(
-            "fps={:.6},scale={}:{}:flags=bicubic,format=rgba",
-            self.fps, self.width, self.height
-        );
+        let vf = format!("fps={:.6},scale={}:{}:flags=bicubic,format=rgba", self.fps, self.width, self.height);
         cmd.args(["-an", "-sn", "-dn", "-vf", &vf, "-f", "rawvideo", "-pix_fmt", "rgba", "-"]);
         cmd.stdout(Stdio::piped()).stderr(Stdio::null());
         let mut child = cmd.spawn()?;

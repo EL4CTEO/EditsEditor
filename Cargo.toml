@@ -92,3 +92,9 @@ opt-level = 1
 
 [profile.dev.package."*"]
 opt-level = 3
+
+[workspace.lints.clippy]
+# DSP/image kernels index several buffers in lockstep; explicit indices read clearer there.
+needless_range_loop = "allow"
+too_many_arguments = "allow"
+type_complexity = "allow"

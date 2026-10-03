@@ -127,7 +127,8 @@ fn to_skia(path: &BezPath, dx: f64, dy: f64) -> Option<tiny_skia::Path> {
 }
 
 fn skia_color(c: &Color) -> tiny_skia::Color {
-    tiny_skia::Color::from_rgba(c.0[0].clamp(0.0, 1.0), c.0[1].clamp(0.0, 1.0), c.0[2].clamp(0.0, 1.0), c.0[3].clamp(0.0, 1.0)).unwrap_or(tiny_skia::Color::WHITE)
+    tiny_skia::Color::from_rgba(c.0[0].clamp(0.0, 1.0), c.0[1].clamp(0.0, 1.0), c.0[2].clamp(0.0, 1.0), c.0[3].clamp(0.0, 1.0))
+        .unwrap_or(tiny_skia::Color::WHITE)
 }
 
 /// Rasterize a shape. The returned frame is centered on the shape origin (0, 0).
@@ -146,64 +147,65 @@ pub fn render_shape(src: &ShapeSource, trim: Option<(f64, f64, f64)>) -> Frame {
     let (dx, dy) = (w as f64 / 2.0, h as f64 / 2.0);
     if let Some(sp) = to_skia(&path, dx, dy) {
         let trimmed = trim.is_some_and(|(a, b, _)| a > 0.0 || b < 1.0);
-        if let Some(fill) = &src.fill {
-            if !trimmed {
-                let mut paint = tiny_skia::Paint { anti_alias: true, ..Default::default() };
-                match fill {
-                    Fill::Solid(c) => paint.set_color(skia_color(c)),
-                    Fill::Gradient(g) => {
-                        let stops: Vec<tiny_skia::GradientStop> =
-                            g.stops.iter().map(|(o, c)| tiny_skia::GradientStop::new(*o as f32, skia_color(c))).collect();
-                        let shader = match g.kind {
-                            GradientKind::Linear => {
-                                let a = g.angle.to_radians();
-                                let (cx, cy) = (a.cos() * bbox.width() / 2.0, a.sin() * bbox.height() / 2.0);
-                                tiny_skia::LinearGradient::new(
-                                    tiny_skia::Point::from_xy((dx - cx) as f32, (dy - cy) as f32),
-                                    tiny_skia::Point::from_xy((dx + cx) as f32, (dy + cy) as f32),
-                                    stops,
-                                    tiny_skia::SpreadMode::Pad,
-                                    tiny_skia::Transform::identity(),
-                                )
-                            }
-                            GradientKind::Radial => tiny_skia::RadialGradient::new(
-                                tiny_skia::Point::from_xy(dx as f32, dy as f32),
-                                0.0,
-                                tiny_skia::Point::from_xy(dx as f32, dy as f32),
-                                (bbox.width().max(bbox.height()) / 2.0) as f32,
+        if let Some(fill) = &src.fill
+            && !trimmed
+        {
+            let mut paint = tiny_skia::Paint { anti_alias: true, ..Default::default() };
+            match fill {
+                Fill::Solid(c) => paint.set_color(skia_color(c)),
+                Fill::Gradient(g) => {
+                    let stops: Vec<tiny_skia::GradientStop> =
+                        g.stops.iter().map(|(o, c)| tiny_skia::GradientStop::new(*o as f32, skia_color(c))).collect();
+                    let shader = match g.kind {
+                        GradientKind::Linear => {
+                            let a = g.angle.to_radians();
+                            let (cx, cy) = (a.cos() * bbox.width() / 2.0, a.sin() * bbox.height() / 2.0);
+                            tiny_skia::LinearGradient::new(
+                                tiny_skia::Point::from_xy((dx - cx) as f32, (dy - cy) as f32),
+                                tiny_skia::Point::from_xy((dx + cx) as f32, (dy + cy) as f32),
                                 stops,
                                 tiny_skia::SpreadMode::Pad,
                                 tiny_skia::Transform::identity(),
-                            ),
-                        };
-                        if let Some(s) = shader {
-                            paint.shader = s;
+                            )
                         }
+                        GradientKind::Radial => tiny_skia::RadialGradient::new(
+                            tiny_skia::Point::from_xy(dx as f32, dy as f32),
+                            0.0,
+                            tiny_skia::Point::from_xy(dx as f32, dy as f32),
+                            (bbox.width().max(bbox.height()) / 2.0) as f32,
+                            stops,
+                            tiny_skia::SpreadMode::Pad,
+                            tiny_skia::Transform::identity(),
+                        ),
+                    };
+                    if let Some(s) = shader {
+                        paint.shader = s;
                     }
                 }
-                let rule = if matches!(src.shape, ShapeKind::Ring { .. }) { tiny_skia::FillRule::EvenOdd } else { tiny_skia::FillRule::Winding };
-                pm.fill_path(&sp, &paint, rule, tiny_skia::Transform::identity(), None);
             }
+            let rule =
+                if matches!(src.shape, ShapeKind::Ring { .. }) { tiny_skia::FillRule::EvenOdd } else { tiny_skia::FillRule::Winding };
+            pm.fill_path(&sp, &paint, rule, tiny_skia::Transform::identity(), None);
         }
-        if let Some(st) = &src.stroke {
-            if st.width > 0.0 {
-                let mut paint = tiny_skia::Paint { anti_alias: true, ..Default::default() };
-                paint.set_color(skia_color(&st.color));
-                let mut stroke = tiny_skia::Stroke {
-                    width: st.width as f32,
-                    line_cap: match st.cap {
-                        LineCap::Round => tiny_skia::LineCap::Round,
-                        LineCap::Butt => tiny_skia::LineCap::Butt,
-                        LineCap::Square => tiny_skia::LineCap::Square,
-                    },
-                    line_join: tiny_skia::LineJoin::Round,
-                    ..Default::default()
-                };
-                if st.dash.len() >= 2 {
-                    stroke.dash = tiny_skia::StrokeDash::new(st.dash.iter().map(|d| *d as f32).collect(), 0.0);
-                }
-                pm.stroke_path(&sp, &paint, &stroke, tiny_skia::Transform::identity(), None);
+        if let Some(st) = &src.stroke
+            && st.width > 0.0
+        {
+            let mut paint = tiny_skia::Paint { anti_alias: true, ..Default::default() };
+            paint.set_color(skia_color(&st.color));
+            let mut stroke = tiny_skia::Stroke {
+                width: st.width as f32,
+                line_cap: match st.cap {
+                    LineCap::Round => tiny_skia::LineCap::Round,
+                    LineCap::Butt => tiny_skia::LineCap::Butt,
+                    LineCap::Square => tiny_skia::LineCap::Square,
+                },
+                line_join: tiny_skia::LineJoin::Round,
+                ..Default::default()
+            };
+            if st.dash.len() >= 2 {
+                stroke.dash = tiny_skia::StrokeDash::new(st.dash.iter().map(|d| *d as f32).collect(), 0.0);
             }
+            pm.stroke_path(&sp, &paint, &stroke, tiny_skia::Transform::identity(), None);
         }
     }
     Frame::new(w, h, pm.take(), true)

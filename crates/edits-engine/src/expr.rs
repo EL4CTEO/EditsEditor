@@ -181,7 +181,9 @@ pub fn register_common(engine: &mut Engine) {
     engine.register_fn("ease", |name: &str, x: f64| easing_by_name(name).apply(x, 1.0));
     engine.register_fn("ease", |x: f64| Easing::EaseInOutCubic.apply(x, 1.0));
     engine.register_fn("vec2", |x: f64, y: f64| -> Array { vec![Dynamic::from_float(x), Dynamic::from_float(y)] });
-    engine.register_fn("vec3", |x: f64, y: f64, z: f64| -> Array { vec![Dynamic::from_float(x), Dynamic::from_float(y), Dynamic::from_float(z)] });
+    engine.register_fn("vec3", |x: f64, y: f64, z: f64| -> Array {
+        vec![Dynamic::from_float(x), Dynamic::from_float(y), Dynamic::from_float(z)]
+    });
     engine.register_fn("rgba", |r: f64, g: f64, b: f64, a: f64| -> Array {
         vec![Dynamic::from_float(r), Dynamic::from_float(g), Dynamic::from_float(b), Dynamic::from_float(a)]
     });
@@ -201,7 +203,9 @@ pub fn register_common(engine: &mut Engine) {
         vec![Dynamic::from_float(r + m), Dynamic::from_float(g + m), Dynamic::from_float(b + m), Dynamic::from_float(1.0)]
     });
     // vector math on arrays
-    engine.register_fn("add", |a: Array, b: Array| -> Array { a.iter().zip(b.iter()).map(|(x, y)| Dynamic::from_float(num(x) + num(y))).collect() });
+    engine.register_fn("add", |a: Array, b: Array| -> Array {
+        a.iter().zip(b.iter()).map(|(x, y)| Dynamic::from_float(num(x) + num(y))).collect()
+    });
     engine.register_fn("mul", |a: Array, k: f64| -> Array { a.iter().map(|x| Dynamic::from_float(num(x) * k)).collect() });
     engine.register_fn("mix", |a: Array, b: Array, t: f64| -> Array {
         a.iter().zip(b.iter()).map(|(x, y)| Dynamic::from_float(num(x) + (num(y) - num(x)) * t)).collect()
@@ -240,7 +244,9 @@ fn register_vector_ops(engine: &mut Engine, override_add: bool) {
 
 fn register_expr_fns(engine: &mut Engine) {
     // ---- beat sync ----
-    engine.register_fn("beat", || with_ctx(|c, _| TimingData::last_before(&c.timing.beats, c.root_time).map(|(i, _)| i as f64).unwrap_or(-1.0), -1.0));
+    engine.register_fn("beat", || {
+        with_ctx(|c, _| TimingData::last_before(&c.timing.beats, c.root_time).map(|(i, _)| i as f64).unwrap_or(-1.0), -1.0)
+    });
     engine.register_fn("beat_phase", || with_ctx(|c, _| c.timing.beat_phase(c.root_time), 0.0));
     engine.register_fn("since_beat", || with_ctx(|c, _| TimingData::since(&c.timing.beats, c.root_time), 1e6));
     engine.register_fn("since_downbeat", || with_ctx(|c, _| TimingData::since(&c.timing.downbeats, c.root_time), 1e6));
@@ -256,9 +262,12 @@ fn register_expr_fns(engine: &mut Engine) {
     });
     engine.register_fn("pulse", |decay: f64| with_ctx(|c, _| (-TimingData::since(&c.timing.beats, c.root_time) * decay).exp(), 0.0));
     engine.register_fn("pulse", || with_ctx(|c, _| (-TimingData::since(&c.timing.beats, c.root_time) * 8.0).exp(), 0.0));
-    engine.register_fn("downbeat_pulse", |decay: f64| with_ctx(|c, _| (-TimingData::since(&c.timing.downbeats, c.root_time) * decay).exp(), 0.0));
+    engine.register_fn("downbeat_pulse", |decay: f64| {
+        with_ctx(|c, _| (-TimingData::since(&c.timing.downbeats, c.root_time) * decay).exp(), 0.0)
+    });
     engine.register_fn("drop_pulse", |decay: f64| with_ctx(|c, _| (-TimingData::since(&c.timing.drops, c.root_time) * decay).exp(), 0.0));
-    engine.register_fn("accent_pulse", |decay: f64| with_ctx(|c, _| (-TimingData::since(&c.timing.accents, c.root_time) * decay).exp(), 0.0));
+    engine
+        .register_fn("accent_pulse", |decay: f64| with_ctx(|c, _| (-TimingData::since(&c.timing.accents, c.root_time) * decay).exp(), 0.0));
     fn pulse_every(n: i64, decay: f64) -> f64 {
         with_ctx(
             |c, _| match TimingData::last_before(&c.timing.beats, c.root_time) {
@@ -279,7 +288,9 @@ fn register_expr_fns(engine: &mut Engine) {
             0.0,
         )
     });
-    engine.register_fn("bar", || with_ctx(|c, _| TimingData::last_before(&c.timing.downbeats, c.root_time).map(|(i, _)| i as f64).unwrap_or(-1.0), -1.0));
+    engine.register_fn("bar", || {
+        with_ctx(|c, _| TimingData::last_before(&c.timing.downbeats, c.root_time).map(|(i, _)| i as f64).unwrap_or(-1.0), -1.0)
+    });
     engine.register_fn("beats_to_sec", |b: f64| with_ctx(|c, _| b * c.timing.beat_len(), b * 0.5));
     engine.register_fn("beat_len", || with_ctx(|c, _| c.timing.beat_len(), 0.5));
     engine.register_fn("in_drop", |window: f64| with_ctx(|c, _| TimingData::since(&c.timing.drops, c.root_time) < window, false));
@@ -305,7 +316,9 @@ fn register_expr_fns(engine: &mut Engine) {
             vec![Dynamic::from_float(0.0), Dynamic::from_float(0.0)],
         )
     });
-    engine.register_fn("jitter", |rate: f64, amp: f64| with_ctx(|c, t| (hash01((t * rate).floor() as i64 as u64, c.seed) * 2.0 - 1.0) * amp, 0.0));
+    engine.register_fn("jitter", |rate: f64, amp: f64| {
+        with_ctx(|c, t| (hash01((t * rate).floor() as i64 as u64, c.seed) * 2.0 - 1.0) * amp, 0.0)
+    });
     engine.register_fn("flicker", |rate: f64| with_ctx(|c, t| hash01((t * rate).floor() as i64 as u64, c.seed ^ 3), 0.0));
     engine.register_fn("rand_clip", || with_ctx(|c, _| hash01(c.seed, 5), 0.0));
     // ---- time helpers ----
@@ -314,7 +327,9 @@ fn register_expr_fns(engine: &mut Engine) {
     engine.register_fn("tween", |t0: f64, t1: f64, v0: f64, v1: f64, ease: &str| {
         with_ctx(|_, t| v0 + (v1 - v0) * easing_by_name(ease).apply(((t - t0) / (t1 - t0)).clamp(0.0, 1.0), t1 - t0), v0)
     });
-    engine.register_fn("tween", |t0: f64, t1: f64, v0: f64, v1: f64| with_ctx(|_, t| v0 + (v1 - v0) * ((t - t0) / (t1 - t0)).clamp(0.0, 1.0), v0));
+    engine.register_fn("tween", |t0: f64, t1: f64, v0: f64, v1: f64| {
+        with_ctx(|_, t| v0 + (v1 - v0) * ((t - t0) / (t1 - t0)).clamp(0.0, 1.0), v0)
+    });
     engine.register_fn("var", |name: &str| -> Dynamic {
         with_ctx(|c, _| c.variables.get(name).map(from_value).unwrap_or(Dynamic::UNIT), Dynamic::UNIT)
     });

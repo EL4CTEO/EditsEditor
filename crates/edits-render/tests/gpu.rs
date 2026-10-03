@@ -1,7 +1,7 @@
 use edits_core::{BlendMode, Color, Fit, MatteMode, TransformState, Vec2};
 use edits_fx::{EffectKind, Library};
 use edits_media::Frame;
-use edits_render::{EffectCall, GpuContext, GpuOptions, Globals, MaskParams, OutputMode, Renderer, transform};
+use edits_render::{EffectCall, Globals, GpuContext, GpuOptions, MaskParams, OutputMode, Renderer, transform};
 
 fn renderer() -> Option<Renderer> {
     match GpuContext::new(&GpuOptions::default()) {
@@ -33,11 +33,9 @@ fn place_composite_mask_readback() {
     f.clear(acc, Color::BLACK.to_linear_premul());
     let tex = f.upload(Some(1), &src);
     let layer = f.target(128, 72);
-    let mut st = TransformState::default();
-    st.scale = Vec2::splat(0.5);
-    st.rotation = 15.0;
+    let st = TransformState { scale: Vec2::splat(0.5), rotation: 15.0, ..Default::default() };
     let pp = transform::place_params((64, 32), (128, 72), Fit::Contain, None, &st, (false, false), None, [1.0; 4]);
-    f.place(layer, tex, &[pp.clone()]).unwrap();
+    f.place(layer, tex, std::slice::from_ref(&pp)).unwrap();
     // motion blur variant
     let mut st2 = st;
     st2.position = Vec2::new(10.0, 0.0);
@@ -45,38 +43,46 @@ fn place_composite_mask_readback() {
     let layer2 = f.target(128, 72);
     f.place(layer2, tex, &[pp.clone(), pp2]).unwrap();
     let mask = f
-        .mask(None, (128, 72), &MaskParams {
-            shape: 1,
-            mode: 0,
-            invert: false,
-            center: [0.0, 0.0],
-            size: [80.0, 50.0],
-            radius: 0.0,
-            feather: 8.0,
-            expansion: 0.0,
-            opacity: 1.0,
-            offset: [0.0, 0.0],
-            rotation: 0.0,
-            scale: [1.0, 1.0],
-            points: vec![],
-        })
+        .mask(
+            None,
+            (128, 72),
+            &MaskParams {
+                shape: 1,
+                mode: 0,
+                invert: false,
+                center: [0.0, 0.0],
+                size: [80.0, 50.0],
+                radius: 0.0,
+                feather: 8.0,
+                expansion: 0.0,
+                opacity: 1.0,
+                offset: [0.0, 0.0],
+                rotation: 0.0,
+                scale: [1.0, 1.0],
+                points: vec![],
+            },
+        )
         .unwrap();
     let poly = f
-        .mask(Some(mask), (128, 72), &MaskParams {
-            shape: 2,
-            mode: 1,
-            invert: false,
-            center: [0.0, 0.0],
-            size: [0.0, 0.0],
-            radius: 0.0,
-            feather: 2.0,
-            expansion: 0.0,
-            opacity: 1.0,
-            offset: [0.0, 0.0],
-            rotation: 0.0,
-            scale: [1.0, 1.0],
-            points: vec![[-10.0, -10.0], [10.0, -10.0], [0.0, 10.0]],
-        })
+        .mask(
+            Some(mask),
+            (128, 72),
+            &MaskParams {
+                shape: 2,
+                mode: 1,
+                invert: false,
+                center: [0.0, 0.0],
+                size: [0.0, 0.0],
+                radius: 0.0,
+                feather: 2.0,
+                expansion: 0.0,
+                opacity: 1.0,
+                offset: [0.0, 0.0],
+                rotation: 0.0,
+                scale: [1.0, 1.0],
+                points: vec![[-10.0, -10.0], [10.0, -10.0], [0.0, 10.0]],
+            },
+        )
         .unwrap();
     let mut acc = acc;
     for mode in BlendMode::ALL {
@@ -99,7 +105,16 @@ fn every_builtin_effect_runs() {
         let mut f = r.frame();
         let ta = f.upload(Some(10), &a);
         let tb = f.upload(Some(11), &checker(48, 48));
-        let g = Globals { time: 1.3, local_time: 0.7, progress: 0.4, duration: 2.0, seed: 0.37, bpm: 120.0, beat_time: 0.1, ..Default::default() };
+        let g = Globals {
+            time: 1.3,
+            local_time: 0.7,
+            progress: 0.4,
+            duration: 2.0,
+            seed: 0.37,
+            bpm: 120.0,
+            beat_time: 0.1,
+            ..Default::default()
+        };
         let (input, input2) = match def.kind {
             EffectKind::Filter => (Some(ta), None),
             EffectKind::Transition => (Some(ta), Some(tb)),

@@ -35,10 +35,11 @@ pub fn get_object(p: &Project, id: &str) -> Result<Json> {
 pub fn set_object(p: &mut Project, id: &str, mut v: Json) -> Result<()> {
     let r = p.find(id).ok_or_else(|| EditError::NotFound(id.to_string()))?;
     // Keep the id stable unless the caller explicitly changes it.
-    if let Some(o) = v.as_object_mut() {
-        if !matches!(r, ObjectRef::Comp(_) | ObjectRef::Asset(_)) && !o.contains_key("id") {
-            o.insert("id".into(), Json::String(id.to_string()));
-        }
+    if let Some(o) = v.as_object_mut()
+        && !matches!(r, ObjectRef::Comp(_) | ObjectRef::Asset(_))
+        && !o.contains_key("id")
+    {
+        o.insert("id".into(), Json::String(id.to_string()));
     }
     match r {
         ObjectRef::Comp(c) => {
@@ -205,12 +206,7 @@ pub fn set_expression(p: &mut Project, id: &str, path: &str, expr: Option<String
     let mut obj = get_object(p, id)?;
     let slot = path_get_mut(&mut obj, path).ok_or_else(|| EditError::NotFound(format!("{id}.{path}")))?;
     let mut prop: Property<Value> = if slot.is_null() {
-        Property::Animated(Box::new(crate::property::Animated {
-            keyframes: vec![],
-            value: None,
-            expr: None,
-            r#loop: Default::default(),
-        }))
+        Property::Animated(Box::new(crate::property::Animated { keyframes: vec![], value: None, expr: None, r#loop: Default::default() }))
     } else {
         serde_json::from_value(slot.clone()).map_err(|e| EditError::Invalid(format!("{path} is not animatable: {e}")))?
     };
@@ -324,10 +320,10 @@ pub fn add_clip(p: &mut Project, comp: Option<&str>, target: TrackTarget, mut cl
         obj.insert("duration".into(), dur.into());
     }
     let clip: Clip = from_json(clip, "clip")?;
-    if let ClipSource::Media { asset, .. } = &clip.source {
-        if !p.assets.contains_key(asset) {
-            return Err(EditError::NotFound(format!("asset '{asset}' (import it first)")));
-        }
+    if let ClipSource::Media { asset, .. } = &clip.source
+        && !p.assets.contains_key(asset)
+    {
+        return Err(EditError::NotFound(format!("asset '{asset}' (import it first)")));
     }
     p.compositions[&cid].tracks[ti].clips.push(clip);
     sort_track(p, &cid, ti);
@@ -370,11 +366,7 @@ pub fn split_clip(p: &mut Project, id: &str, t: f64) -> Result<String> {
     let loc = p.find_clip(id).ok_or_else(|| EditError::NotFound(id.to_string()))?;
     let clip = p.clip_at(&loc).unwrap().clone();
     if t <= clip.start + 1e-6 || t >= clip.end() - 1e-6 {
-        return Err(EditError::Invalid(format!(
-            "split time {t} is outside clip {id} ({}..{})",
-            clip.start,
-            clip.end()
-        )));
+        return Err(EditError::Invalid(format!("split time {t} is outside clip {id} ({}..{})", clip.start, clip.end())));
     }
     let local = t - clip.start;
     let new_id = p.new_id("c");
@@ -580,11 +572,7 @@ pub fn assign_missing_ids(p: &mut Project) {
 
 /// Snap a time to the nearest beat (if within `tolerance` seconds).
 pub fn snap_to_beat(p: &Project, t: f64, tolerance: f64) -> f64 {
-    p.timing
-        .beats_abs()
-        .min_by(|a, b| (a - t).abs().total_cmp(&(b - t).abs()))
-        .filter(|b| (b - t).abs() <= tolerance)
-        .unwrap_or(t)
+    p.timing.beats_abs().min_by(|a, b| (a - t).abs().total_cmp(&(b - t).abs())).filter(|b| (b - t).abs() <= tolerance).unwrap_or(t)
 }
 
 #[cfg(test)]

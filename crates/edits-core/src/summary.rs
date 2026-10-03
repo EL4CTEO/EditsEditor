@@ -55,7 +55,10 @@ fn source_desc(p: &Project, c: &Clip) -> String {
             }
             format!("text \"{}\" {}px {}", txt.replace('\n', "⏎"), t.size, t.font)
         }
-        ClipSource::Shape(s) => format!("shape {}", serde_json::to_value(&s.shape).ok().and_then(|v| v.get("type").and_then(|t| t.as_str()).map(String::from)).unwrap_or_default()),
+        ClipSource::Shape(s) => format!(
+            "shape {}",
+            serde_json::to_value(&s.shape).ok().and_then(|v| v.get("type").and_then(|t| t.as_str()).map(String::from)).unwrap_or_default()
+        ),
         ClipSource::Generator { effect, .. } => format!("generator {effect}"),
         ClipSource::Comp { comp } => format!("comp {comp}"),
         ClipSource::Adjustment => "adjustment".into(),
@@ -90,8 +93,7 @@ pub fn summarize(p: &Project) -> String {
             }
         );
         if !t.sections.is_empty() {
-            let secs: Vec<String> =
-                t.sections.iter().map(|s| format!("{}[{:.1}-{:.1}]", s.label, s.start, s.end)).collect();
+            let secs: Vec<String> = t.sections.iter().map(|s| format!("{}[{:.1}-{:.1}]", s.label, s.start, s.end)).collect();
             let _ = writeln!(o, "Sections: {}", secs.join(" "));
         }
     }
@@ -103,10 +105,10 @@ pub fn summarize(p: &Project) -> String {
                 if i.width > 0 {
                     let _ = write!(d, " {}x{}", i.width, i.height);
                 }
-                if let Some(f) = i.fps {
-                    if a.kind == AssetKind::Video {
-                        let _ = write!(d, " {f:.3}fps");
-                    }
+                if let Some(f) = i.fps
+                    && a.kind == AssetKind::Video
+                {
+                    let _ = write!(d, " {f:.3}fps");
                 }
                 if let Some(dur) = i.duration {
                     let _ = write!(d, " {}", mmss(dur));
@@ -155,7 +157,11 @@ fn comp_summary(o: &mut String, p: &Project, cid: &str, comp: &Composition) {
         let _ = writeln!(o, "  comp fx: {}", fx_list(&comp.effects));
     }
     if !comp.markers.is_empty() {
-        let m: Vec<String> = comp.markers.iter().map(|m| format!("{}@{:.2}{}", m.id, m.t, if m.label.is_empty() { String::new() } else { format!("\"{}\"", m.label) })).collect();
+        let m: Vec<String> = comp
+            .markers
+            .iter()
+            .map(|m| format!("{}@{:.2}{}", m.id, m.t, if m.label.is_empty() { String::new() } else { format!("\"{}\"", m.label) }))
+            .collect();
         let _ = writeln!(o, "  markers: {}", m.join(" "));
     }
     let _ = writeln!(o, "  tracks (bottom→top):");
@@ -218,10 +224,10 @@ fn comp_summary(o: &mut String, p: &Project, cid: &str, comp: &Composition) {
             }
             if c.opacity.is_animated() {
                 line.push_str(" opacity~");
-            } else if let Property::Static(v) = c.opacity {
-                if v != 1.0 {
-                    let _ = write!(line, " opacity={v}");
-                }
+            } else if let Property::Static(v) = c.opacity
+                && v != 1.0
+            {
+                let _ = write!(line, " opacity={v}");
             }
             let tr = &c.transform;
             let animated: Vec<&str> = [

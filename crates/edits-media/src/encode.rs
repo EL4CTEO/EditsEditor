@@ -124,11 +124,7 @@ pub fn fps_rational(fps: f64) -> String {
             return format!("{n}/{d}");
         }
     }
-    if (fps - fps.round()).abs() < 1e-6 {
-        format!("{}", fps.round() as u64)
-    } else {
-        format!("{}/1000", (fps * 1000.0).round() as u64)
-    }
+    if (fps - fps.round()).abs() < 1e-6 { format!("{}", fps.round() as u64) } else { format!("{}/1000", (fps * 1000.0).round() as u64) }
 }
 
 fn crf_from_quality(q: f64, lo: f64, hi: f64) -> String {
@@ -185,16 +181,45 @@ pub fn video_args(ff: &Ffmpeg, s: &ExportSettings) -> (Vec<String>, String) {
         }
         Codec::Vp9 => {
             name = "libvpx-vp9".into();
-            push(&mut a, &["-c:v", "libvpx-vp9", "-crf", &crf_from_quality(q, 12.0, 45.0), "-b:v", "0", "-row-mt", "1", "-deadline", "good", "-cpu-used", "2", "-pix_fmt", "yuva420p"]);
+            push(
+                &mut a,
+                &[
+                    "-c:v",
+                    "libvpx-vp9",
+                    "-crf",
+                    &crf_from_quality(q, 12.0, 45.0),
+                    "-b:v",
+                    "0",
+                    "-row-mt",
+                    "1",
+                    "-deadline",
+                    "good",
+                    "-cpu-used",
+                    "2",
+                    "-pix_fmt",
+                    "yuva420p",
+                ],
+            );
         }
         Codec::Gif => {
             name = "gif".into();
-            push(&mut a, &["-filter_complex", "[0:v]split[a][b];[a]palettegen=stats_mode=diff:reserve_transparent=1[p];[b][p]paletteuse=dither=sierra2_4a:alpha_threshold=128", "-loop", "0"]);
+            push(
+                &mut a,
+                &[
+                    "-filter_complex",
+                    "[0:v]split[a][b];[a]palettegen=stats_mode=diff:reserve_transparent=1[p];[b][p]paletteuse=dither=sierra2_4a:alpha_threshold=128",
+                    "-loop",
+                    "0",
+                ],
+            );
         }
         Codec::Webp => {
             let enc = pick(&["libwebp_anim", "libwebp"]).unwrap_or_else(|| "libwebp".into());
             name = enc.clone();
-            push(&mut a, &["-c:v", &enc, "-lossless", "0", "-q:v", &format!("{:.0}", q.clamp(1.0, 100.0)), "-loop", "0", "-pix_fmt", "yuva420p"]);
+            push(
+                &mut a,
+                &["-c:v", &enc, "-lossless", "0", "-q:v", &format!("{:.0}", q.clamp(1.0, 100.0)), "-loop", "0", "-pix_fmt", "yuva420p"],
+            );
         }
         Codec::Apng => {
             name = "apng".into();
@@ -242,10 +267,10 @@ impl Encoder {
     pub fn start(ff: &Ffmpeg, cfg: EncoderConfig) -> Result<Encoder> {
         let s = cfg.settings;
         let mut output = PathBuf::from(&s.output);
-        if let Some(parent) = output.parent() {
-            if !parent.as_os_str().is_empty() {
-                std::fs::create_dir_all(parent)?;
-            }
+        if let Some(parent) = output.parent()
+            && !parent.as_os_str().is_empty()
+        {
+            std::fs::create_dir_all(parent)?;
         }
         let codec = s.resolved_codec();
         if codec == Codec::PngSequence && !s.output.contains('%') {
@@ -258,7 +283,8 @@ impl Encoder {
         cmd.arg("-y");
         cmd.args(["-f", "rawvideo", "-pix_fmt", "rgba", "-s", &format!("{}x{}", cfg.width, cfg.height)]);
         cmd.args(["-framerate", &fps_rational(cfg.fps), "-i", "-"]);
-        let with_audio = s.audio && cfg.audio_wav.is_some() && !matches!(codec, Codec::Gif | Codec::Webp | Codec::Apng | Codec::PngSequence);
+        let with_audio =
+            s.audio && cfg.audio_wav.is_some() && !matches!(codec, Codec::Gif | Codec::Webp | Codec::Apng | Codec::PngSequence);
         if with_audio {
             cmd.arg("-i").arg(cfg.audio_wav.as_ref().unwrap());
         }
@@ -322,11 +348,7 @@ impl Encoder {
         if frame.len() != self.frame_bytes {
             return Err(MediaError::Encode(format!("frame has {} bytes, expected {}", frame.len(), self.frame_bytes)));
         }
-        self.tx
-            .as_ref()
-            .unwrap()
-            .send(frame)
-            .map_err(|_| MediaError::Encode("encoder pipe closed (ffmpeg exited early)".into()))?;
+        self.tx.as_ref().unwrap().send(frame).map_err(|_| MediaError::Encode("encoder pipe closed (ffmpeg exited early)".into()))?;
         self.frames_written += 1;
         Ok(())
     }

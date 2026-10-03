@@ -250,7 +250,11 @@ impl App {
         if !self.playing {
             return;
         }
-        let t = if self.audio.enabled() && self.audio.has_mix() { self.audio.time() } else { self.play_origin + self.play_started.elapsed().as_secs_f64() };
+        let t = if self.audio.enabled() && self.audio.has_mix() {
+            self.audio.time()
+        } else {
+            self.play_origin + self.play_started.elapsed().as_secs_f64()
+        };
         if t >= self.duration() {
             if self.looping {
                 self.time = 0.0;
@@ -288,11 +292,11 @@ impl App {
                 self.open(p);
             }
             #[cfg(windows)]
-            if ui.button("…").clicked() {
-                if let Some(p) = rfd::FileDialog::new().add_filter("EditsEditor project", &["json"]).pick_file() {
-                    self.path_input = p.display().to_string();
-                    self.open(p);
-                }
+            if ui.button("…").clicked()
+                && let Some(p) = rfd::FileDialog::new().add_filter("EditsEditor project", &["json"]).pick_file()
+            {
+                self.path_input = p.display().to_string();
+                self.open(p);
             }
             ui.separator();
             let can_undo = self.engine.as_ref().is_some_and(|e| e.history.can_undo());
@@ -391,7 +395,15 @@ impl App {
         // ruler
         let ruler = Rect::from_min_size(rect.min, Vec2::new(rect.width(), ruler_h));
         painter.rect_filled(ruler, 0.0, Color32::from_rgb(32, 32, 40));
-        let step = if self.px_per_sec > 200.0 { 0.25 } else if self.px_per_sec > 60.0 { 1.0 } else if self.px_per_sec > 20.0 { 5.0 } else { 10.0 };
+        let step = if self.px_per_sec > 200.0 {
+            0.25
+        } else if self.px_per_sec > 60.0 {
+            1.0
+        } else if self.px_per_sec > 20.0 {
+            5.0
+        } else {
+            10.0
+        };
         let mut t = 0.0;
         while t <= comp.duration {
             let x = x_of(t);
@@ -399,7 +411,13 @@ impl App {
                 break;
             }
             painter.line_segment([Pos2::new(x, ruler.bottom() - 6.0), Pos2::new(x, ruler.bottom())], Stroke::new(1.0, Color32::GRAY));
-            painter.text(Pos2::new(x + 2.0, ruler.top() + 2.0), egui::Align2::LEFT_TOP, format!("{t:.0}"), egui::FontId::monospace(10.0), Color32::GRAY);
+            painter.text(
+                Pos2::new(x + 2.0, ruler.top() + 2.0),
+                egui::Align2::LEFT_TOP,
+                format!("{t:.0}"),
+                egui::FontId::monospace(10.0),
+                Color32::GRAY,
+            );
             t += step;
         }
         // sections band & beats
@@ -414,26 +432,45 @@ impl App {
         }
         for b in timing.beats_abs() {
             let x = x_of(b);
-            painter.line_segment([Pos2::new(x, ruler.bottom()), Pos2::new(x, rect.bottom())], Stroke::new(1.0, Color32::from_rgba_unmultiplied(255, 255, 255, 18)));
+            painter.line_segment(
+                [Pos2::new(x, ruler.bottom()), Pos2::new(x, rect.bottom())],
+                Stroke::new(1.0, Color32::from_rgba_unmultiplied(255, 255, 255, 18)),
+            );
         }
         for b in timing.downbeats.iter().map(|b| b + timing.offset) {
             let x = x_of(b);
-            painter.line_segment([Pos2::new(x, ruler.bottom() - 10.0), Pos2::new(x, rect.bottom())], Stroke::new(1.0, Color32::from_rgba_unmultiplied(255, 255, 255, 45)));
+            painter.line_segment(
+                [Pos2::new(x, ruler.bottom() - 10.0), Pos2::new(x, rect.bottom())],
+                Stroke::new(1.0, Color32::from_rgba_unmultiplied(255, 255, 255, 45)),
+            );
         }
         for d in timing.drops.iter().map(|b| b + timing.offset) {
             let x = x_of(d);
-            painter.line_segment([Pos2::new(x, ruler.top()), Pos2::new(x, rect.bottom())], Stroke::new(2.0, Color32::from_rgb(255, 60, 90)));
+            painter
+                .line_segment([Pos2::new(x, ruler.top()), Pos2::new(x, rect.bottom())], Stroke::new(2.0, Color32::from_rgb(255, 60, 90)));
         }
         for m in &comp.markers {
             let x = x_of(m.t);
-            painter.text(Pos2::new(x + 2.0, ruler.top() + 10.0), egui::Align2::LEFT_TOP, &m.label, egui::FontId::proportional(10.0), Color32::YELLOW);
+            painter.text(
+                Pos2::new(x + 2.0, ruler.top() + 10.0),
+                egui::Align2::LEFT_TOP,
+                &m.label,
+                egui::FontId::proportional(10.0),
+                Color32::YELLOW,
+            );
         }
         // tracks (top track drawn first)
         let mut clicked_clip = None;
         for (vi, (ti, track)) in comp.tracks.iter().enumerate().rev().enumerate() {
             let _ = ti;
             let y = ruler.bottom() + 4.0 + vi as f32 * row_h;
-            painter.text(Pos2::new(rect.left() + 2.0, y + 2.0), egui::Align2::LEFT_TOP, &track.id, egui::FontId::monospace(9.0), Color32::from_gray(110));
+            painter.text(
+                Pos2::new(rect.left() + 2.0, y + 2.0),
+                egui::Align2::LEFT_TOP,
+                &track.id,
+                egui::FontId::monospace(9.0),
+                Color32::from_gray(110),
+            );
             for c in &track.clips {
                 let r = Rect::from_x_y_ranges(x_of(c.start)..=x_of(c.end()).max(x_of(c.start) + 2.0), (y + 2.0)..=(y + row_h - 2.0));
                 if r.right() < rect.left() || r.left() > rect.right() {
@@ -468,7 +505,13 @@ impl App {
                     other => format!("{} {}", c.id, other.kind_name()),
                 };
                 let fx = if c.effects.is_empty() { String::new() } else { format!(" ·{}fx", c.effects.len()) };
-                painter.with_clip_rect(r).text(r.left_center() + Vec2::new(4.0, 0.0), egui::Align2::LEFT_CENTER, format!("{label}{fx}"), egui::FontId::proportional(11.0), Color32::WHITE);
+                painter.with_clip_rect(r).text(
+                    r.left_center() + Vec2::new(4.0, 0.0),
+                    egui::Align2::LEFT_CENTER,
+                    format!("{label}{fx}"),
+                    egui::FontId::proportional(11.0),
+                    Color32::WHITE,
+                );
                 if resp.clicked() && resp.interact_pointer_pos().is_some_and(|p| r.contains(p)) {
                     clicked_clip = Some(c.id.clone());
                 }
@@ -480,10 +523,11 @@ impl App {
         if let Some(id) = clicked_clip {
             self.selected = Some(id);
             self.tab = SideTab::Inspector;
-        } else if (resp.clicked() || resp.dragged()) && resp.interact_pointer_pos().is_some_and(|p| p.y < ruler.bottom() + 4.0 || resp.dragged()) {
-            if let Some(p) = resp.interact_pointer_pos() {
-                self.seek(t_of(p.x));
-            }
+        } else if (resp.clicked() || resp.dragged())
+            && resp.interact_pointer_pos().is_some_and(|p| p.y < ruler.bottom() + 4.0 || resp.dragged())
+            && let Some(p) = resp.interact_pointer_pos()
+        {
+            self.seek(t_of(p.x));
         }
     }
 
@@ -548,10 +592,10 @@ impl App {
                 self.selected = None;
                 self.revision += 1;
             }
-            if ui.button("Go to").clicked() {
-                if let Some(c) = e.project.clip(&id) {
-                    self.time = c.start;
-                }
+            if ui.button("Go to").clicked()
+                && let Some(c) = e.project.clip(&id)
+            {
+                self.time = c.start;
             }
         });
         egui::ScrollArea::vertical().show(ui, |ui| {
@@ -594,7 +638,8 @@ impl App {
         if let Some((is_fx, id)) = action {
             let res = if is_fx {
                 let t = target.clone().unwrap_or_default();
-                e.mutate("viewer add effect", |p| ops::add_effect(p, &t, edits_core::EffectInstance::new("", &id), None).map(|_| ())).map_err(|e| e.to_string())
+                e.mutate("viewer add effect", |p| ops::add_effect(p, &t, edits_core::EffectInstance::new("", &id), None).map(|_| ()))
+                    .map_err(|e| e.to_string())
             } else {
                 let scope = lib.preset(&id).map(|p| p.scope);
                 let t = if scope == Some(edits_fx::PresetScope::Clip) { target.as_deref() } else { None };
@@ -660,7 +705,9 @@ impl eframe::App for App {
 }
 
 fn main() -> eframe::Result<()> {
-    tracing_subscriber::fmt().with_env_filter(tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "warn".into())).init();
+    tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "warn".into()))
+        .init();
     let path = std::env::args().nth(1).map(PathBuf::from);
     let options = eframe::NativeOptions {
         renderer: eframe::Renderer::Wgpu,

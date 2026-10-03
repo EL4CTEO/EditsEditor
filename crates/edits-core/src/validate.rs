@@ -61,18 +61,24 @@ pub fn validate(p: &Project) -> Vec<Issue> {
                     out.push(Issue::new(Severity::Error, Some(&c.id), "clip duration must be > 0"));
                 }
                 if c.start >= comp.duration {
-                    out.push(Issue::new(Severity::Warning, Some(&c.id), format!("clip starts after the composition ends ({}s)", comp.duration)));
+                    out.push(Issue::new(
+                        Severity::Warning,
+                        Some(&c.id),
+                        format!("clip starts after the composition ends ({}s)", comp.duration),
+                    ));
                 } else if c.end() > comp.duration + 1e-6 {
                     out.push(Issue::new(Severity::Info, Some(&c.id), "clip extends past the composition end"));
                 }
-                if let Some((pe, pid)) = prev_end {
-                    if c.start < pe - 1e-6 && c.enabled && c.transition_in.is_none() {
-                        out.push(Issue::new(
-                            Severity::Info,
-                            Some(&c.id),
-                            format!("overlaps {pid} on the same track (later clip draws on top)"),
-                        ));
-                    }
+                if let Some((pe, pid)) = prev_end
+                    && c.start < pe - 1e-6
+                    && c.enabled
+                    && c.transition_in.is_none()
+                {
+                    out.push(Issue::new(
+                        Severity::Info,
+                        Some(&c.id),
+                        format!("overlaps {pid} on the same track (later clip draws on top)"),
+                    ));
                 }
                 if c.enabled {
                     prev_end = Some((c.end(), &c.id));
@@ -80,16 +86,19 @@ pub fn validate(p: &Project) -> Vec<Issue> {
                 match &c.source {
                     ClipSource::Media { asset, .. } => {
                         if let Some(a) = p.assets.get(asset) {
-                            if let (Some(info), None, None) = (&a.info, &c.time_remap, c.freeze) {
-                                if let (Some(d), crate::property::Property::Static(s)) = (info.duration, &c.speed) {
-                                    let need = c.source_in + s.abs() * c.duration;
-                                    if need > d + 0.05 && c.end_behavior == crate::model::EndBehavior::Hold {
-                                        out.push(Issue::new(
-                                            Severity::Info,
-                                            Some(&c.id),
-                                            format!("source runs out at {:.2}s local; last frame is held", ((d - c.source_in) / s.abs()).max(0.0)),
-                                        ));
-                                    }
+                            if let (Some(info), None, None) = (&a.info, &c.time_remap, c.freeze)
+                                && let (Some(d), crate::property::Property::Static(s)) = (info.duration, &c.speed)
+                            {
+                                let need = c.source_in + s.abs() * c.duration;
+                                if need > d + 0.05 && c.end_behavior == crate::model::EndBehavior::Hold {
+                                    out.push(Issue::new(
+                                        Severity::Info,
+                                        Some(&c.id),
+                                        format!(
+                                            "source runs out at {:.2}s local; last frame is held",
+                                            ((d - c.source_in) / s.abs()).max(0.0)
+                                        ),
+                                    ));
                                 }
                             }
                         } else {
@@ -105,15 +114,15 @@ pub fn validate(p: &Project) -> Vec<Issue> {
                     }
                     _ => {}
                 }
-                if let Some(m) = &c.matte {
-                    if p.clip(&m.clip).is_none() {
-                        out.push(Issue::new(Severity::Error, Some(&c.id), format!("matte clip '{}' not found", m.clip)));
-                    }
+                if let Some(m) = &c.matte
+                    && p.clip(&m.clip).is_none()
+                {
+                    out.push(Issue::new(Severity::Error, Some(&c.id), format!("matte clip '{}' not found", m.clip)));
                 }
-                if let Some(tr) = &c.transition_in {
-                    if tr.duration > c.duration {
-                        out.push(Issue::new(Severity::Warning, Some(&c.id), "transition is longer than the clip"));
-                    }
+                if let Some(tr) = &c.transition_in
+                    && tr.duration > c.duration
+                {
+                    out.push(Issue::new(Severity::Warning, Some(&c.id), "transition is longer than the clip"));
                 }
             }
         }

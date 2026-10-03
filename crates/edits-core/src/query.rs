@@ -176,10 +176,7 @@ impl Project {
     /// Iterate over all clips with their composition id and track index.
     pub fn all_clips(&self) -> impl Iterator<Item = (&str, usize, &Clip)> {
         self.compositions.iter().flat_map(|(cid, comp)| {
-            comp.tracks
-                .iter()
-                .enumerate()
-                .flat_map(move |(ti, t)| t.clips.iter().map(move |c| (cid.as_str(), ti, c)))
+            comp.tracks.iter().enumerate().flat_map(move |(ti, t)| t.clips.iter().map(move |c| (cid.as_str(), ti, c)))
         })
     }
 
@@ -187,10 +184,6 @@ impl Project {
     pub fn previous_clip(&self, loc: &ClipLoc) -> Option<&Clip> {
         let track = self.compositions.get(&loc.comp)?.tracks.get(loc.track)?;
         let me = track.clips.get(loc.clip)?;
-        track
-            .clips
-            .iter()
-            .filter(|c| c.id != me.id && c.enabled && c.start < me.start)
-            .max_by(|a, b| a.end().total_cmp(&b.end()))
+        track.clips.iter().filter(|c| c.id != me.id && c.enabled && c.start < me.start).max_by(|a, b| a.end().total_cmp(&b.end()))
     }
 }

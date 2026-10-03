@@ -29,7 +29,8 @@ impl ImageSequence {
                 let n = pat[start..].chars().take_while(|c| *c == '#').count();
                 pat.replace_range(start..start + n, &format!("%0{n}d"));
             }
-            let (pre, width, post) = parse_printf(&pat).ok_or_else(|| MediaError::Probe(format!("unsupported sequence pattern '{pattern}'")))?;
+            let (pre, width, post) =
+                parse_printf(&pat).ok_or_else(|| MediaError::Probe(format!("unsupported sequence pattern '{pattern}'")))?;
             let first = (0..=1).find(|i| Path::new(&format_index(&pre, width, *i, &post)).exists());
             let Some(mut i) = first else {
                 return Err(MediaError::NotFound(pattern.to_string()));

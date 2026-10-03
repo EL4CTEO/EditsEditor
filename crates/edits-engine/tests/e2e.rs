@@ -22,7 +22,13 @@ fn make_media(dir: &Path) {
     // 8s 120bpm click track
     let st = ff
         .cmd()
-        .args(["-y", "-f", "lavfi", "-i", "aevalsrc='0.9*sin(2*PI*60*t)*exp(-30*mod(t,0.5))+0.4*random(0)*exp(-60*mod(t,0.5))':s=48000:d=8"])
+        .args([
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            "aevalsrc='0.9*sin(2*PI*60*t)*exp(-30*mod(t,0.5))+0.4*random(0)*exp(-60*mod(t,0.5))':s=48000:d=8",
+        ])
         .arg(dir.join("music.wav"))
         .status()
         .unwrap();
@@ -53,7 +59,10 @@ fn full_pipeline() {
     assert!(ids.contains(&"clip") && ids.contains(&"music") && ids.contains(&"logo") && ids.contains(&"lyrics"), "{ids:?}");
 
     // music on its own track + analysis
-    e.mutate("music", |p| ops::add_clip(p, None, ops::TrackTarget::New, json!({"name": "music", "start": 0, "source": {"type": "media", "asset": "music"}}))).unwrap();
+    e.mutate("music", |p| {
+        ops::add_clip(p, None, ops::TrackTarget::New, json!({"name": "music", "start": 0, "source": {"type": "media", "asset": "music"}}))
+    })
+    .unwrap();
     let an = e.analyze_audio("music", &AnalysisOptions::default(), true, None).unwrap();
     assert!((an.bpm - 120.0).abs() < 3.0, "bpm {}", an.bpm);
     assert!(!e.project.timing.beats.is_empty());
@@ -79,8 +88,12 @@ fn full_pipeline() {
         })
         .unwrap();
     let c2 = e.mutate("split", |p| ops::split_clip(p, &c1, 2.0)).unwrap();
-    e.mutate("transition", |p| ops::set_path(p, &c2, "transition_in", json!({"effect": "zoom_through", "duration": 0.5, "ease": "ease_in_out"}))).unwrap();
-    e.mutate("mask", |p| ops::set_path(p, &c2, "masks", json!([{"shape": {"type": "ellipse", "size": [260, 160]}, "feather": 20}]))).unwrap();
+    e.mutate("transition", |p| {
+        ops::set_path(p, &c2, "transition_in", json!({"effect": "zoom_through", "duration": 0.5, "ease": "ease_in_out"}))
+    })
+    .unwrap();
+    e.mutate("mask", |p| ops::set_path(p, &c2, "masks", json!([{"shape": {"type": "ellipse", "size": [260, 160]}, "feather": 20}])))
+        .unwrap();
     e.mutate("echo", |p| ops::set_path(p, &c1, "echo", json!({"count": 3, "interval": 0.05}))).unwrap();
 
     // text with animator, shape, generator overlay, logo with matte, adjustment layer
@@ -112,11 +125,22 @@ fn full_pipeline() {
         let mut inner = edits_core::Composition::new("inner", 160, 90, 24.0, 2.0);
         inner.background = edits_core::Color([0.1, 0.0, 0.2, 1.0]);
         ops::add_comp(p, Some("inner"), inner)?;
-        ops::add_clip(p, Some("inner"), ops::TrackTarget::New, json!({"start": 0, "duration": 2, "source": {"type": "generator", "effect": "plasma"}}))?;
-        ops::add_clip(p, None, ops::TrackTarget::New, json!({"start": 2.5, "duration": 1.5, "source": {"type": "comp", "comp": "inner"},
-            "fit": "none", "transform": {"scale": 0.6, "position": [100, 40]}, "end_behavior": "loop"}))?;
+        ops::add_clip(
+            p,
+            Some("inner"),
+            ops::TrackTarget::New,
+            json!({"start": 0, "duration": 2, "source": {"type": "generator", "effect": "plasma"}}),
+        )?;
+        ops::add_clip(
+            p,
+            None,
+            ops::TrackTarget::New,
+            json!({"start": 2.5, "duration": 1.5, "source": {"type": "comp", "comp": "inner"},
+            "fit": "none", "transform": {"scale": 0.6, "position": [100, 40]}, "end_behavior": "loop"}),
+        )?;
         Ok(())
-    }).unwrap();
+    })
+    .unwrap();
 
     let issues = e.validate();
     let errors: Vec<_> = issues.iter().filter(|i| i.severity == edits_core::validate::Severity::Error).collect();

@@ -51,10 +51,7 @@ impl AudioBuffer {
         let f = (pos - i as f64) as f32;
         let a = i * 2;
         let b = a + 2;
-        (
-            self.samples[a] + (self.samples[b] - self.samples[a]) * f,
-            self.samples[a + 1] + (self.samples[b + 1] - self.samples[a + 1]) * f,
-        )
+        (self.samples[a] + (self.samples[b] - self.samples[a]) * f, self.samples[a + 1] + (self.samples[b + 1] - self.samples[a + 1]) * f)
     }
 
     /// Write a 32-bit float WAV file.

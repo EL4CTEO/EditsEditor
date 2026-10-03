@@ -97,7 +97,17 @@ pub fn detect_scenes(ff: &Ffmpeg, path: &Path, src_fps: f64, opts: &SceneOptions
     if let Some(r) = opts.range {
         cmd.args(["-t", &format!("{:.3}", (r[1] - r[0]).max(0.1))]);
     }
-    cmd.args(["-an", "-sn", "-vf", &format!("fps={fps},scale={W}:{H}:flags=area,format=rgb24"), "-f", "rawvideo", "-pix_fmt", "rgb24", "-"]);
+    cmd.args([
+        "-an",
+        "-sn",
+        "-vf",
+        &format!("fps={fps},scale={W}:{H}:flags=area,format=rgb24"),
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "rgb24",
+        "-",
+    ]);
     let mut child = cmd.stdout(Stdio::piped()).stderr(Stdio::null()).spawn()?;
     let mut out = child.stdout.take().unwrap();
     let mut stats = vec![];

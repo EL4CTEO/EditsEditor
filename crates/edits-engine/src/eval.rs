@@ -184,21 +184,22 @@ impl<'a> EvalCtx<'a> {
             if !clip.enabled {
                 continue;
             }
-            if let Some((a, b)) = Self::transition_window(clip) {
-                if t >= a && t < b {
-                    if let Some(pi) = track
-                        .clips
-                        .iter()
-                        .enumerate()
-                        .filter(|(j, c)| *j != ci && c.enabled && c.start < clip.start)
-                        .max_by(|x, y| x.1.end().total_cmp(&y.1.end()))
-                        .map(|(j, _)| j)
-                    {
-                        skip.insert(track.clips[pi].id.as_str());
-                        in_transition.push((ci, pi));
-                    } else {
-                        in_transition.push((ci, usize::MAX));
-                    }
+            if let Some((a, b)) = Self::transition_window(clip)
+                && t >= a
+                && t < b
+            {
+                if let Some(pi) = track
+                    .clips
+                    .iter()
+                    .enumerate()
+                    .filter(|(j, c)| *j != ci && c.enabled && c.start < clip.start)
+                    .max_by(|x, y| x.1.end().total_cmp(&y.1.end()))
+                    .map(|(j, _)| j)
+                {
+                    skip.insert(track.clips[pi].id.as_str());
+                    in_transition.push((ci, pi));
+                } else {
+                    in_transition.push((ci, usize::MAX));
                 }
             }
         }
@@ -239,7 +240,15 @@ impl<'a> EvalCtx<'a> {
                             drop(ev);
                             let mut g = self.globals(comp, t, local, b - a, seed_of(&clip.id, "transition"));
                             g.progress = progress as f32;
-                            f.effect(EffectCall { def, params: &params, globals: g, input: Some(from_t), input2: Some(to_t), extra: None, size: (w, h) })?
+                            f.effect(EffectCall {
+                                def,
+                                params: &params,
+                                globals: g,
+                                input: Some(from_t),
+                                input2: Some(to_t),
+                                extra: None,
+                                size: (w, h),
+                            })?
                         }
                         _ => {
                             self.warn(format!("clip {}: unknown transition '{}' (falling back to crossfade)", clip.id, tr.effect));
@@ -362,7 +371,14 @@ impl<'a> EvalCtx<'a> {
                     self.warn(format!("clip {}: missing asset '{asset}'", clip.id));
                     return Ok(None);
                 };
-                if matches!(a.kind, edits_core::AssetKind::Audio | edits_core::AssetKind::Font | edits_core::AssetKind::Lut | edits_core::AssetKind::Subtitles | edits_core::AssetKind::Data) {
+                if matches!(
+                    a.kind,
+                    edits_core::AssetKind::Audio
+                        | edits_core::AssetKind::Font
+                        | edits_core::AssetKind::Lut
+                        | edits_core::AssetKind::Subtitles
+                        | edits_core::AssetKind::Data
+                ) {
                     return Ok(None);
                 }
                 let Some(st) = Self::source_time(clip, local, MediaPool::duration(a)) else { return Ok(None) };
@@ -384,7 +400,8 @@ impl<'a> EvalCtx<'a> {
                 };
                 let tex = f.upload(vis.key, &vis.frame);
                 // logical size = asset native size (decode may be downscaled)
-                let size = a.info.as_ref().filter(|i| i.width > 0).map(|i| (i.width, i.height)).unwrap_or((vis.frame.width, vis.frame.height));
+                let size =
+                    a.info.as_ref().filter(|i| i.width > 0).map(|i| (i.width, i.height)).unwrap_or((vis.frame.width, vis.frame.height));
                 (tex, size)
             }
             ClipSource::Solid { color, size } => {
@@ -408,11 +425,14 @@ impl<'a> EvalCtx<'a> {
                 let spacing = src.letter_spacing.eval(local, &ev, &0.0);
                 fit = Fit::None;
                 let animated = TextRenderer::is_animated(src);
-                let key = (!animated).then(|| key_of(("text", serde_json::to_string(src).unwrap_or_default(), color.to_hex(), spacing.to_bits())));
+                let key = (!animated)
+                    .then(|| key_of(("text", serde_json::to_string(src).unwrap_or_default(), color.to_hex(), spacing.to_bits())));
                 let tex = match key.and_then(|k| f.cached(k)) {
                     Some(t) => t,
                     None => {
-                        let frame = self.text.render(src, &TextFrameParams { color, letter_spacing: spacing, time: local, duration: clip.duration });
+                        let frame = self
+                            .text
+                            .render(src, &TextFrameParams { color, letter_spacing: spacing, time: local, duration: clip.duration });
                         f.upload(key, &frame)
                     }
                 };
@@ -421,8 +441,15 @@ impl<'a> EvalCtx<'a> {
             }
             ClipSource::Shape(src) => {
                 fit = Fit::None;
-                let trim = src.trim.as_ref().map(|tr| (tr.start.eval(local, &ev, &0.0), tr.end.eval(local, &ev, &1.0), tr.offset.eval(local, &ev, &0.0)));
-                let key = key_of(("shape", serde_json::to_string(src).unwrap_or_default(), trim.map(|t| (t.0.to_bits(), t.1.to_bits(), t.2.to_bits()))));
+                let trim = src
+                    .trim
+                    .as_ref()
+                    .map(|tr| (tr.start.eval(local, &ev, &0.0), tr.end.eval(local, &ev, &1.0), tr.offset.eval(local, &ev, &0.0)));
+                let key = key_of((
+                    "shape",
+                    serde_json::to_string(src).unwrap_or_default(),
+                    trim.map(|t| (t.0.to_bits(), t.1.to_bits(), t.2.to_bits())),
+                ));
                 let tex = match f.cached(key) {
                     Some(t) => t,
                     None => {
@@ -439,11 +466,16 @@ impl<'a> EvalCtx<'a> {
                     return Ok(None);
                 };
                 if def.kind != EffectKind::Generator {
-                    self.warn(format!("clip {}: '{effect}' is a {} not a generator (use it in effects instead)", clip.id, def.kind.as_str()));
+                    self.warn(format!(
+                        "clip {}: '{effect}' is a {} not a generator (use it in effects instead)",
+                        clip.id,
+                        def.kind.as_str()
+                    ));
                 }
                 let slots = self.eval_params(def, params, &ev, local);
                 let g = self.globals(comp, t, local, clip.duration, seed_of(&clip.id, effect));
-                let out = f.effect(EffectCall { def, params: &slots, globals: g, input: None, input2: None, extra: None, size: (cw, ch) })?;
+                let out =
+                    f.effect(EffectCall { def, params: &slots, globals: g, input: None, input2: None, extra: None, size: (cw, ch) })?;
                 fit = Fit::Stretch;
                 owned_src = true;
                 (out, (cw, ch))
@@ -488,7 +520,8 @@ impl<'a> EvalCtx<'a> {
             return Ok(None);
         }
         // identity fast path: generator / nested comp already in comp space
-        let identity = owned_src && samples.len() == 1 && clip.crop.is_none() && is_identity(&self.transform_at_static(clip)) && src_size == (cw, ch);
+        let identity =
+            owned_src && samples.len() == 1 && clip.crop.is_none() && is_identity(&self.transform_at_static(clip)) && src_size == (cw, ch);
         if identity {
             return Ok(Some(src));
         }
@@ -585,7 +618,13 @@ impl<'a> EvalCtx<'a> {
     }
 
     /// Evaluate effect parameters into uniform slots.
-    pub fn eval_params(&self, def: &edits_fx::EffectDef, params: &indexmap::IndexMap<String, Property<Value>>, ev: &ClipEval, local: f64) -> Vec<[f32; 4]> {
+    pub fn eval_params(
+        &self,
+        def: &edits_fx::EffectDef,
+        params: &indexmap::IndexMap<String, Property<Value>>,
+        ev: &ClipEval,
+        local: f64,
+    ) -> Vec<[f32; 4]> {
         for k in params.keys() {
             if def.param(k).is_none() {
                 self.warn(format!(
@@ -623,17 +662,22 @@ impl<'a> EvalCtx<'a> {
             if !inst.enabled {
                 continue;
             }
-            if let Some([a, b]) = inst.range {
-                if local < a || local > b {
-                    continue;
-                }
+            if let Some([a, b]) = inst.range
+                && (local < a || local > b)
+            {
+                continue;
             }
             let Some(def) = self.lib.effect(&inst.effect) else {
                 self.warn(format!("unknown effect '{}' (see effects_list)", inst.effect));
                 continue;
             };
             if def.kind != EffectKind::Filter {
-                self.warn(format!("effect '{}' is a {} — use it as a {}", def.id, def.kind.as_str(), if def.kind == EffectKind::Transition { "transition_in" } else { "generator clip" }));
+                self.warn(format!(
+                    "effect '{}' is a {} — use it as a {}",
+                    def.id,
+                    def.kind.as_str(),
+                    if def.kind == EffectKind::Transition { "transition_in" } else { "generator clip" }
+                ));
                 continue;
             }
             let mix = inst.mix.eval(local, ev, &1.0) as f32;
@@ -644,7 +688,12 @@ impl<'a> EvalCtx<'a> {
             // texture parameter (image / LUT)
             let mut extra = None;
             if let Some(tp) = def.texture_param() {
-                let id = inst.params.get(&tp.name).map(|p| p.eval(local, ev, &tp.default)).and_then(|v| v.as_str().map(String::from)).unwrap_or_default();
+                let id = inst
+                    .params
+                    .get(&tp.name)
+                    .map(|p| p.eval(local, ev, &tp.default))
+                    .and_then(|v| v.as_str().map(String::from))
+                    .unwrap_or_default();
                 if let Some(a) = self.project.assets.get(&id) {
                     match tp.ty {
                         ParamType::Lut => match self.media.lut(a) {
@@ -708,7 +757,9 @@ impl<'a> EvalCtx<'a> {
                     let s = size.eval(local, &ev, &Vec2::new(comp.height as f64 / 2.0, comp.height as f64 / 2.0));
                     (1, [c.x() as f32, c.y() as f32], [s.x() as f32, s.y() as f32], 0.0, vec![])
                 }
-                MaskShape::Polygon { points } => (2, [0.0, 0.0], [0.0, 0.0], 0.0, points.iter().map(|p| [p.x() as f32, p.y() as f32]).collect()),
+                MaskShape::Polygon { points } => {
+                    (2, [0.0, 0.0], [0.0, 0.0], 0.0, points.iter().map(|p| [p.x() as f32, p.y() as f32]).collect())
+                }
                 MaskShape::Path { d } => (2, [0.0, 0.0], [0.0, 0.0], 0.0, shape::flatten_svg(d, 64)),
             };
             let mode = match m.mode {

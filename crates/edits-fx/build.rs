@@ -1,5 +1,8 @@
 //! Embeds every built-in effect (`effects/**/*.wgsl`) and preset (`presets/**/*.rhai`).
-use std::{env, fs, path::{Path, PathBuf}};
+use std::{
+    env, fs,
+    path::{Path, PathBuf},
+};
 
 fn collect(dir: &Path, ext: &str, out: &mut Vec<PathBuf>) {
     let Ok(rd) = fs::read_dir(dir) else { return };

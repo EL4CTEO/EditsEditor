@@ -62,10 +62,7 @@ impl History {
     }
 
     pub fn labels(&self) -> (Vec<&str>, Vec<&str>) {
-        (
-            self.undo.iter().map(|e| e.label.as_str()).collect(),
-            self.redo.iter().rev().map(|e| e.label.as_str()).collect(),
-        )
+        (self.undo.iter().map(|e| e.label.as_str()).collect(), self.redo.iter().rev().map(|e| e.label.as_str()).collect())
     }
 
     pub fn can_undo(&self) -> bool {

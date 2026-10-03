@@ -130,10 +130,9 @@ pub fn topic(name: &str) -> Option<String> {
             "Easing names: {}\nObject forms: {{\"bezier\":[x1,y1,x2,y2]}}, {{\"steps\":n}}, {{\"back\":overshoot}}, {{\"spring\":{{\"stiffness\":170,\"damping\":12,\"mass\":1}}}}, {{\"elastic\":{{\"amplitude\":1,\"period\":0.3}}}}.\nThe ease on a keyframe shapes the segment to the NEXT keyframe. AMV favorites: punch (zoom hits), whip (velocity), snap, glide, ease_out_expo, ease_out_back.",
             edits_core::Easing::NAMES.join(", ")
         ),
-        "blend_modes" | "blend" => format!(
-            "Blend modes: {}",
-            edits_core::BlendMode::ALL.iter().map(|b| b.name()).collect::<Vec<_>>().join(", ")
-        ),
+        "blend_modes" | "blend" => {
+            format!("Blend modes: {}", edits_core::BlendMode::ALL.iter().map(|b| b.name()).collect::<Vec<_>>().join(", "))
+        }
         "tips" | "craft" => TIPS.to_string(),
         _ => return None,
     })

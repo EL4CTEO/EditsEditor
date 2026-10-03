@@ -53,11 +53,13 @@ fn source_time_audio(clip: &Clip, local: f64, dur: Option<f64>) -> f64 {
     let mut s = clip.source_time(local, dur);
     // stutter: repeat a slice inside the window
     for fx in &clip.audio.effects {
-        if let AudioEffect::Stutter { start, end, slice } = fx {
-            if local >= *start && local < *end && *slice > 0.0 {
-                let into = (local - start).rem_euclid(*slice);
-                s = clip.source_time(*start + into, dur);
-            }
+        if let AudioEffect::Stutter { start, end, slice } = fx
+            && local >= *start
+            && local < *end
+            && *slice > 0.0
+        {
+            let into = (local - start).rem_euclid(*slice);
+            s = clip.source_time(*start + into, dur);
         }
     }
     match dur {
@@ -68,7 +70,11 @@ fn source_time_audio(clip: &Clip, local: f64, dur: Option<f64>) -> f64 {
                 if p > d { 2.0 * d - p } else { p }
             }
             _ => {
-                if s >= d { -1.0 } else { s }
+                if s >= d {
+                    -1.0
+                } else {
+                    s
+                }
             }
         },
         _ => s,
@@ -99,7 +105,9 @@ impl Engine {
             !t.muted
                 && t.clips.iter().any(|cl| match &cl.source {
                     ClipSource::Media { asset, no_audio, .. } => {
-                        !no_audio && !cl.audio.mute && self.project.assets.get(asset).and_then(|a| a.info.as_ref()).is_some_and(|i| i.has_audio)
+                        !no_audio
+                            && !cl.audio.mute
+                            && self.project.assets.get(asset).and_then(|a| a.info.as_ref()).is_some_and(|i| i.has_audio)
                     }
                     ClipSource::Comp { comp } => self.has_audio(Some(comp)),
                     _ => false,
@@ -108,7 +116,15 @@ impl Engine {
     }
 
     /// `to_comp`: maps root timeline time → this comp's time. `gain`: accumulated parent gain.
-    fn collect_audio(&mut self, ctx: &Ctx, comp_id: &str, to_comp: TimeMap, gain: f64, depth: u32, out: &mut Vec<MixClip<'static>>) -> Result<()> {
+    fn collect_audio(
+        &mut self,
+        ctx: &Ctx,
+        comp_id: &str,
+        to_comp: TimeMap,
+        gain: f64,
+        depth: u32,
+        out: &mut Vec<MixClip<'static>>,
+    ) -> Result<()> {
         if depth > 8 {
             return Ok(());
         }
@@ -158,7 +174,12 @@ impl Engine {
                         });
                         let c2 = c.clone();
                         let tc2 = tc.clone();
-                        let ctx2 = Ctx { project: ctx.project.clone(), expr: ctx.expr.clone(), timing: ctx.timing.clone(), vars: ctx.vars.clone() };
+                        let ctx2 = Ctx {
+                            project: ctx.project.clone(),
+                            expr: ctx.expr.clone(),
+                            timing: ctx.timing.clone(),
+                            vars: ctx.vars.clone(),
+                        };
                         let fps = comp.fps;
                         let g0 = gain * track_vol * comp_vol;
                         let gain_fn: Box<dyn Fn(f64) -> f64 + Send + Sync> = Box::new(move |t| {
@@ -166,7 +187,8 @@ impl Engine {
                             let local = ct - c2.start;
                             let v = eval_f64(&ctx2, &c2, fps, &c2.audio.volume, local, ct, 1.0).max(0.0);
                             let fi = if c2.audio.fade_in > 0.0 { (local / c2.audio.fade_in).clamp(0.0, 1.0) } else { 1.0 };
-                            let fo = if c2.audio.fade_out > 0.0 { ((c2.duration - local) / c2.audio.fade_out).clamp(0.0, 1.0) } else { 1.0 };
+                            let fo =
+                                if c2.audio.fade_out > 0.0 { ((c2.duration - local) / c2.audio.fade_out).clamp(0.0, 1.0) } else { 1.0 };
                             v * fi * fo * g0
                         });
                         let c3 = c.clone();
@@ -185,7 +207,9 @@ impl Engine {
                                     let p = cutoff.clone();
                                     AudioFx::Highpass { cutoff: Box::new(move |t| p.sample(tcc(t) - cc.start, &20.0)), q: *q }
                                 }
-                                AudioEffect::Echo { delay, feedback, mix } => AudioFx::Echo { delay: *delay, feedback: *feedback, mix: *mix },
+                                AudioEffect::Echo { delay, feedback, mix } => {
+                                    AudioFx::Echo { delay: *delay, feedback: *feedback, mix: *mix }
+                                }
                                 AudioEffect::Distortion { drive } => AudioFx::Distortion { drive: *drive },
                                 AudioEffect::Bitcrush { bits, downsample } => AudioFx::Bitcrush { bits: *bits, downsample: *downsample },
                                 AudioEffect::Gain { db } => {

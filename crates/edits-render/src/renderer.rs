@@ -246,7 +246,11 @@ impl Renderer {
                 wgpu::BindGroupLayoutEntry {
                     binding: 0,
                     visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
-                    ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: false, min_binding_size: None },
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
                     count: None,
                 },
                 samp_entry(1),
@@ -294,7 +298,12 @@ impl Renderer {
         let mk = |w: u32, h: u32, px: [u8; 4]| -> Arc<GpuTex> {
             let t = create_tex(device, w, h, UPLOAD_FORMAT, "const");
             gpu.queue.write_texture(
-                wgpu::TexelCopyTextureInfo { texture: &t.texture, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
+                wgpu::TexelCopyTextureInfo {
+                    texture: &t.texture,
+                    mip_level: 0,
+                    origin: wgpu::Origin3d::ZERO,
+                    aspect: wgpu::TextureAspect::All,
+                },
                 &px.repeat((w * h) as usize),
                 wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(4 * w), rows_per_image: Some(h) },
                 wgpu::Extent3d { width: w, height: h, depth_or_array_layers: 1 },
@@ -357,13 +366,25 @@ impl Renderer {
         }
         let over = wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING;
         let add = wgpu::BlendState {
-            color: wgpu::BlendComponent { src_factor: wgpu::BlendFactor::One, dst_factor: wgpu::BlendFactor::One, operation: wgpu::BlendOperation::Add },
-            alpha: wgpu::BlendComponent { src_factor: wgpu::BlendFactor::One, dst_factor: wgpu::BlendFactor::One, operation: wgpu::BlendOperation::Add },
+            color: wgpu::BlendComponent {
+                src_factor: wgpu::BlendFactor::One,
+                dst_factor: wgpu::BlendFactor::One,
+                operation: wgpu::BlendOperation::Add,
+            },
+            alpha: wgpu::BlendComponent {
+                src_factor: wgpu::BlendFactor::One,
+                dst_factor: wgpu::BlendFactor::One,
+                operation: wgpu::BlendOperation::Add,
+            },
         };
         let effect_module;
         let (module, vs, fs, blend, strip): (&wgpu::ShaderModule, &str, String, Option<wgpu::BlendState>, bool) = match &key {
-            PipeKey::Place { additive } => (&self.modules["place"], "vs_place", "fs_place".into(), Some(if *additive { add } else { over }), true),
-            PipeKey::Source { add: a } => (&self.modules["composite"], "vs_full", "fs_source".into(), Some(if *a { add } else { over }), false),
+            PipeKey::Place { additive } => {
+                (&self.modules["place"], "vs_place", "fs_place".into(), Some(if *additive { add } else { over }), true)
+            }
+            PipeKey::Source { add: a } => {
+                (&self.modules["composite"], "vs_full", "fs_source".into(), Some(if *a { add } else { over }), false)
+            }
             PipeKey::Blend => (&self.modules["composite"], "vs_full", "fs_blend".into(), None, false),
             PipeKey::Mask => (&self.modules["mask"], "vs_full", "fs_mask".into(), None, false),
             PipeKey::Util { entry, .. } => (&self.modules["util"], "vs_full", entry.to_string(), None, false),
@@ -460,15 +481,12 @@ impl<'r> FrameCtx<'r> {
 
     fn alloc(&mut self, w: u32, h: u32, format: wgpu::TextureFormat) -> Tex {
         let key = (w.max(1), h.max(1), format);
-        let tex = self
-            .free
-            .get_mut(&key)
-            .and_then(|v| v.pop())
-            .or_else(|| self.r.pool.get_mut(&key).and_then(|v| v.pop()))
-            .unwrap_or_else(|| {
+        let tex = self.free.get_mut(&key).and_then(|v| v.pop()).or_else(|| self.r.pool.get_mut(&key).and_then(|v| v.pop())).unwrap_or_else(
+            || {
                 self.r.stats.textures_created += 1;
                 Arc::new(create_tex(&self.r.gpu.device, key.0, key.1, format, "work"))
-            });
+            },
+        );
         self.slots.push(Slot { tex, pooled: true, cleared: false, straight: false, released: false });
         Tex(self.slots.len() as u32 - 1)
     }
@@ -557,7 +575,14 @@ impl<'r> FrameCtx<'r> {
     }
 
     /// Record a pass. `draws` = list of (uniform bytes, textures); all drawn into `target`.
-    fn run(&mut self, pipe: &wgpu::RenderPipeline, target: Tex, draws: &[(Vec<u8>, [Option<Tex>; 4])], vertices: u32, clear: Option<wgpu::Color>) {
+    fn run(
+        &mut self,
+        pipe: &wgpu::RenderPipeline,
+        target: Tex,
+        draws: &[(Vec<u8>, [Option<Tex>; 4])],
+        vertices: u32,
+        clear: Option<wgpu::Color>,
+    ) {
         let mut groups = Vec::with_capacity(draws.len());
         for (bytes, tex) in draws {
             let (ci, off) = self.push_uniform(bytes);
@@ -603,14 +628,15 @@ impl<'r> FrameCtx<'r> {
 
     /// Upload a decoded frame. With a `key`, the texture is cached across frames.
     pub fn upload(&mut self, key: Option<u64>, frame: &MediaFrame) -> Tex {
-        if let Some(k) = key {
-            if let Some(t) = self.r.uploads.get(&k).cloned() {
-                self.r.stats.upload_hits += 1;
-                return self.wrap(t, true);
-            }
+        if let Some(k) = key
+            && let Some(t) = self.r.uploads.get(&k).cloned()
+        {
+            self.r.stats.upload_hits += 1;
+            return self.wrap(t, true);
         }
         self.r.stats.upload_misses += 1;
-        let data: std::borrow::Cow<[u8]> = if frame.premultiplied { std::borrow::Cow::Owned(unpremultiply(&frame.data)) } else { std::borrow::Cow::Borrowed(&frame.data) };
+        let data: std::borrow::Cow<[u8]> =
+            if frame.premultiplied { std::borrow::Cow::Owned(unpremultiply(&frame.data)) } else { std::borrow::Cow::Borrowed(&frame.data) };
         let tex = match key {
             Some(_) => Arc::new(create_tex(&self.r.gpu.device, frame.width, frame.height, UPLOAD_FORMAT, "upload")),
             None => {
@@ -644,7 +670,12 @@ impl<'r> FrameCtx<'r> {
         let tex = Arc::new(create_tex(&self.r.gpu.device, w, h, WORK_FORMAT, "lut"));
         let halfs: Vec<u16> = data.iter().map(|v| f32_to_f16(*v)).collect();
         self.r.gpu.queue.write_texture(
-            wgpu::TexelCopyTextureInfo { texture: &tex.texture, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
+            wgpu::TexelCopyTextureInfo {
+                texture: &tex.texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
             bytemuck::cast_slice(&halfs),
             wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(8 * w), rows_per_image: Some(h) },
             wgpu::Extent3d { width: w, height: h, depth_or_array_layers: 1 },
@@ -704,7 +735,15 @@ impl<'r> FrameCtx<'r> {
     }
 
     /// Composite `src` onto `dst`. Returns the handle holding the result (may be `dst`).
-    pub fn composite(&mut self, dst: Tex, src: Tex, mode: BlendMode, opacity: f32, mask: Option<Tex>, matte: Option<(Tex, MatteMode)>) -> Result<Tex> {
+    pub fn composite(
+        &mut self,
+        dst: Tex,
+        src: Tex,
+        mode: BlendMode,
+        opacity: f32,
+        mask: Option<Tex>,
+        matte: Option<(Tex, MatteMode)>,
+    ) -> Result<Tex> {
         let matte_mode = match matte.map(|m| m.1) {
             None => 0.0,
             Some(MatteMode::Alpha) => 1.0,
@@ -829,13 +868,18 @@ impl<'r> FrameCtx<'r> {
                 g.resolution = [pw as f32, ph as f32];
                 g.texel = [1.0 / pw as f32, 1.0 / ph as f32];
                 g.pass_data = pass.data;
-                g.src_resolution = t0.map(|t| {
-                    let (a, b) = self.size(t);
-                    [a as f32, b as f32]
-                })
-                .unwrap_or([pw as f32, ph as f32]);
+                g.src_resolution = t0
+                    .map(|t| {
+                        let (a, b) = self.size(t);
+                        [a as f32, b as f32]
+                    })
+                    .unwrap_or([pw as f32, ph as f32]);
                 let u = EffectUniforms { g, p: params };
-                let pipe = self.r.pipeline(PipeKey::Effect { module: hash_str(&def.source) ^ hash_str(&def.id), entry: pass.entry.clone() }, WORK_FORMAT, Some(def))?;
+                let pipe = self.r.pipeline(
+                    PipeKey::Effect { module: hash_str(&def.source) ^ hash_str(&def.id), entry: pass.entry.clone() },
+                    WORK_FORMAT,
+                    Some(def),
+                )?;
                 let out = self.target(pw, ph);
                 self.run(&pipe, out, &[(bytemuck::bytes_of(&u).to_vec(), [t0, t1, t2, None])], 3, None);
                 outputs.push(out);
@@ -852,15 +896,15 @@ impl<'r> FrameCtx<'r> {
                 self.release(o);
             }
         }
-        if input != call.input {
-            if let Some(i) = input {
-                self.release(i);
-            }
+        if input != call.input
+            && let Some(i) = input
+        {
+            self.release(i);
         }
-        if input2 != call.input2 {
-            if let Some(i) = input2 {
-                self.release(i);
-            }
+        if input2 != call.input2
+            && let Some(i) = input2
+        {
+            self.release(i);
         }
         Ok(result)
     }
@@ -925,22 +969,21 @@ impl<'r> FrameCtx<'r> {
         let row = (w * 4) as u64;
         let padded = row.div_ceil(256) * 256;
         let size = padded * h as u64;
-        let buffer = self
-            .r
-            .staging
-            .lock()
-            .get_mut(&size)
-            .and_then(|v| v.pop())
-            .unwrap_or_else(|| {
-                self.r.gpu.device.create_buffer(&wgpu::BufferDescriptor {
-                    label: Some("readback"),
-                    size,
-                    usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
-                    mapped_at_creation: false,
-                })
-            });
+        let buffer = self.r.staging.lock().get_mut(&size).and_then(|v| v.pop()).unwrap_or_else(|| {
+            self.r.gpu.device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("readback"),
+                size,
+                usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            })
+        });
         self.encoder.as_mut().unwrap().copy_texture_to_buffer(
-            wgpu::TexelCopyTextureInfo { texture: &out.texture, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
+            wgpu::TexelCopyTextureInfo {
+                texture: &out.texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
             wgpu::TexelCopyBufferInfo {
                 buffer: &buffer,
                 layout: wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(padded as u32), rows_per_image: Some(h) },

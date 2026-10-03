@@ -103,7 +103,10 @@ impl PresetDef {
     }
 
     /// Merge user args over defaults.
-    pub fn resolve_args(&self, args: &serde_json::Map<String, serde_json::Value>) -> Result<serde_json::Map<String, serde_json::Value>, FxError> {
+    pub fn resolve_args(
+        &self,
+        args: &serde_json::Map<String, serde_json::Value>,
+    ) -> Result<serde_json::Map<String, serde_json::Value>, FxError> {
         let mut out = serde_json::Map::new();
         for p in &self.params {
             let v = args.get(&p.name).cloned().unwrap_or_else(|| serde_json::to_value(&p.default).unwrap_or_default());

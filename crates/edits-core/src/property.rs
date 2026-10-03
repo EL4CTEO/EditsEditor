@@ -16,7 +16,10 @@ use std::borrow::Cow;
 use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de::DeserializeOwned};
 
-use crate::{easing::Easing, value::{Animatable, Value}};
+use crate::{
+    easing::Easing,
+    value::{Animatable, Value},
+};
 
 /// Evaluates expressions attached to properties. Implemented by the engine (Rhai).
 pub trait Evaluator {
@@ -108,12 +111,7 @@ impl<T: Animatable> Property<T> {
     }
 
     pub fn expression(expr: impl Into<String>, base: Option<T>) -> Self {
-        Property::Animated(Box::new(Animated {
-            keyframes: vec![],
-            value: base,
-            expr: Some(expr.into()),
-            r#loop: LoopMode::None,
-        }))
+        Property::Animated(Box::new(Animated { keyframes: vec![], value: base, expr: Some(expr.into()), r#loop: LoopMode::None }))
     }
 
     pub fn is_animated(&self) -> bool {
@@ -139,10 +137,7 @@ impl<T: Animatable> Property<T> {
             Property::Animated(a) => {
                 let base = a.sample(t).unwrap_or_else(|| a.value.clone().unwrap_or_else(|| default.clone()));
                 match &a.expr {
-                    Some(expr) => ev
-                        .eval_expr(expr, t, &base.to_value())
-                        .and_then(|v| T::from_value(&v))
-                        .unwrap_or(base),
+                    Some(expr) => ev.eval_expr(expr, t, &base.to_value()).and_then(|v| T::from_value(&v)).unwrap_or(base),
                     None => base,
                 }
             }
@@ -171,12 +166,7 @@ impl<T: Animatable> Property<T> {
     fn make_animated(&mut self) -> &mut Animated<T> {
         if let Property::Static(v) = self {
             let base = v.clone();
-            *self = Property::Animated(Box::new(Animated {
-                keyframes: vec![],
-                value: Some(base),
-                expr: None,
-                r#loop: LoopMode::None,
-            }));
+            *self = Property::Animated(Box::new(Animated { keyframes: vec![], value: Some(base), expr: None, r#loop: LoopMode::None }));
         }
         match self {
             Property::Animated(a) => a,
@@ -324,10 +314,7 @@ impl<'de, T: DeserializeOwned> Deserialize<'de> for Keyframe<T> {
                     .or_else(|| m.remove("time"))
                     .and_then(|x| x.as_f64())
                     .ok_or_else(|| D::Error::custom("keyframe needs numeric 't'"))?;
-                let raw_v = m
-                    .remove("v")
-                    .or_else(|| m.remove("value"))
-                    .ok_or_else(|| D::Error::custom("keyframe needs 'v'"))?;
+                let raw_v = m.remove("v").or_else(|| m.remove("value")).ok_or_else(|| D::Error::custom("keyframe needs 'v'"))?;
                 let v = serde_json::from_value(raw_v).map_err(D::Error::custom)?;
                 let ease = match m.remove("ease").or_else(|| m.remove("easing")) {
                     Some(e) => serde_json::from_value(e).map_err(D::Error::custom)?,
@@ -378,18 +365,15 @@ mod tests {
 
     #[test]
     fn loops() {
-        let p: Property<f64> =
-            serde_json::from_str(r#"{"keyframes":[[0,0],[1,10]], "loop":"cycle"}"#).unwrap();
+        let p: Property<f64> = serde_json::from_str(r#"{"keyframes":[[0,0],[1,10]], "loop":"cycle"}"#).unwrap();
         assert!((p.sample(1.5, &0.0) - 5.0).abs() < 1e-9);
-        let p: Property<f64> =
-            serde_json::from_str(r#"{"keyframes":[[0,0],[1,10]], "loop":"ping_pong"}"#).unwrap();
+        let p: Property<f64> = serde_json::from_str(r#"{"keyframes":[[0,0],[1,10]], "loop":"ping_pong"}"#).unwrap();
         assert!((p.sample(1.25, &0.0) - 7.5).abs() < 1e-9);
     }
 
     #[test]
     fn vec2_keys_and_roundtrip() {
-        let p: Property<Vec2> =
-            serde_json::from_str(r#"{"keyframes":[{"t":0,"v":1},{"t":2,"v":[3,5],"ease":"ease_in"}]}"#).unwrap();
+        let p: Property<Vec2> = serde_json::from_str(r#"{"keyframes":[{"t":0,"v":1},{"t":2,"v":[3,5],"ease":"ease_in"}]}"#).unwrap();
         let s = serde_json::to_string(&p).unwrap();
         let back: Property<Vec2> = serde_json::from_str(&s).unwrap();
         assert_eq!(p, back);

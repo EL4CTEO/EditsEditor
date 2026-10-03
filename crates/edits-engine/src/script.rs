@@ -12,7 +12,7 @@
 
 use std::sync::Arc;
 
-use edits_core::{EffectInstance, Easing, Project, Value, ops};
+use edits_core::{Easing, EffectInstance, Project, Value, ops};
 use edits_fx::{Library, PresetDef, PresetScope};
 use parking_lot::Mutex;
 use rhai::{Array, Dynamic, Engine, EvalAltResult, ImmutableString, Map, Scope};
@@ -111,12 +111,16 @@ pub fn build_engine(h: &ProjectHandle) -> Engine {
     e.register_type_with_name::<ProjectHandle>("Project");
     // ---- structure ----
     e.register_fn("add_track", |h: &mut ProjectHandle, name: &str| -> RResult<String> { h.with(|p| ops::add_track(p, None, name, None)) });
-    e.register_fn("add_track", |h: &mut ProjectHandle, name: &str, comp: &str| -> RResult<String> { h.with(|p| ops::add_track(p, Some(comp), name, None)) });
+    e.register_fn("add_track", |h: &mut ProjectHandle, name: &str, comp: &str| -> RResult<String> {
+        h.with(|p| ops::add_track(p, Some(comp), name, None))
+    });
     e.register_fn("add_clip", |h: &mut ProjectHandle, track: &str, clip: Map| -> RResult<String> {
         let target = if track.is_empty() { ops::TrackTarget::New } else { ops::TrackTarget::Id(track.to_string()) };
         h.with(|p| ops::add_clip(p, None, target, map_to_json(&clip)))
     });
-    e.register_fn("add_clip", |h: &mut ProjectHandle, clip: Map| -> RResult<String> { h.with(|p| ops::add_clip(p, None, ops::TrackTarget::New, map_to_json(&clip))) });
+    e.register_fn("add_clip", |h: &mut ProjectHandle, clip: Map| -> RResult<String> {
+        h.with(|p| ops::add_clip(p, None, ops::TrackTarget::New, map_to_json(&clip)))
+    });
     e.register_fn("add_clip_in", |h: &mut ProjectHandle, comp: &str, track: &str, clip: Map| -> RResult<String> {
         let target = if track.is_empty() { ops::TrackTarget::New } else { ops::TrackTarget::Id(track.to_string()) };
         h.with(|p| ops::add_clip(p, Some(comp), target, map_to_json(&clip)))
@@ -128,16 +132,23 @@ pub fn build_engine(h: &ProjectHandle) -> Engine {
     e.register_fn("add_comp", |h: &mut ProjectHandle, id: &str, w: i64, hgt: i64, fps: f64, dur: f64| -> RResult<String> {
         h.with(|p| ops::add_comp(p, Some(id), edits_core::Composition::new(id, w as u32, hgt as u32, fps, dur)))
     });
-    e.register_fn("update", |h: &mut ProjectHandle, id: &str, patch: Map| -> RResult<()> { h.with(|p| ops::merge_object(p, id, &map_to_json(&patch))) });
-    e.register_fn("set", |h: &mut ProjectHandle, id: &str, path: &str, v: Dynamic| -> RResult<()> { h.with(|p| ops::set_path(p, id, path, from_dyn(&v))) });
-    e.register_fn("get", |h: &mut ProjectHandle, id: &str, path: &str| -> RResult<Dynamic> { h.with(|p| ops::get_path(p, id, path)).map(|v| to_dyn(&v)) });
+    e.register_fn("update", |h: &mut ProjectHandle, id: &str, patch: Map| -> RResult<()> {
+        h.with(|p| ops::merge_object(p, id, &map_to_json(&patch)))
+    });
+    e.register_fn("set", |h: &mut ProjectHandle, id: &str, path: &str, v: Dynamic| -> RResult<()> {
+        h.with(|p| ops::set_path(p, id, path, from_dyn(&v)))
+    });
+    e.register_fn("get", |h: &mut ProjectHandle, id: &str, path: &str| -> RResult<Dynamic> {
+        h.with(|p| ops::get_path(p, id, path)).map(|v| to_dyn(&v))
+    });
     // project-level fields: timing, meta, variables, script_library, root, ...
     e.register_fn("set_project", |h: &mut ProjectHandle, path: &str, v: Dynamic| -> RResult<()> {
         h.with(|p| {
             let mut j = serde_json::to_value(&*p)?;
             let slot = ops::path_get_mut(&mut j, path).ok_or_else(|| edits_core::EditError::NotFound(path.to_string()))?;
             *slot = from_dyn(&v);
-            *p = serde_json::from_value(j).map_err(|e| edits_core::EditError::Invalid(format!("invalid project after set_project({path}): {e}")))?;
+            *p = serde_json::from_value(j)
+                .map_err(|e| edits_core::EditError::Invalid(format!("invalid project after set_project({path}): {e}")))?;
             Ok(())
         })
     });
@@ -155,11 +166,15 @@ pub fn build_engine(h: &ProjectHandle) -> Engine {
     });
     e.register_fn("remove", |h: &mut ProjectHandle, id: &str| -> RResult<String> { h.with(|p| ops::remove(p, id)) });
     e.register_fn("split", |h: &mut ProjectHandle, id: &str, t: f64| -> RResult<String> { h.with(|p| ops::split_clip(p, id, t)) });
-    e.register_fn("move_clip", |h: &mut ProjectHandle, id: &str, start: f64| -> RResult<()> { h.with(|p| ops::move_clip(p, id, Some(start), None)) });
+    e.register_fn("move_clip", |h: &mut ProjectHandle, id: &str, start: f64| -> RResult<()> {
+        h.with(|p| ops::move_clip(p, id, Some(start), None))
+    });
     e.register_fn("move_clip", |h: &mut ProjectHandle, id: &str, start: f64, track: &str| -> RResult<()> {
         h.with(|p| ops::move_clip(p, id, Some(start), Some(track)))
     });
-    e.register_fn("duplicate", |h: &mut ProjectHandle, id: &str, start: f64| -> RResult<String> { h.with(|p| ops::duplicate_clip(p, id, Some(start))) });
+    e.register_fn("duplicate", |h: &mut ProjectHandle, id: &str, start: f64| -> RResult<String> {
+        h.with(|p| ops::duplicate_clip(p, id, Some(start)))
+    });
     e.register_fn("add_marker", |h: &mut ProjectHandle, t: f64, label: &str| -> RResult<String> {
         h.with(|p| ops::add_marker(p, None, edits_core::Marker { id: String::new(), t, label: label.into(), color: None, duration: 0.0 }))
     });
@@ -178,7 +193,9 @@ pub fn build_engine(h: &ProjectHandle) -> Engine {
     });
     // ---- queries ----
     e.register_fn("clip", |h: &mut ProjectHandle, id: &str| -> RResult<Dynamic> { h.with(|p| ops::get_object(p, id)).map(|v| to_dyn(&v)) });
-    e.register_fn("object", |h: &mut ProjectHandle, id: &str| -> RResult<Dynamic> { h.with(|p| ops::get_object(p, id)).map(|v| to_dyn(&v)) });
+    e.register_fn("object", |h: &mut ProjectHandle, id: &str| -> RResult<Dynamic> {
+        h.with(|p| ops::get_object(p, id)).map(|v| to_dyn(&v))
+    });
     e.register_fn("tracks", |h: &mut ProjectHandle| -> Array {
         let s = h.0.lock();
         s.project.root_comp().map(|c| c.tracks.iter().map(|t| Dynamic::from(t.id.clone())).collect()).unwrap_or_default()
@@ -192,7 +209,9 @@ pub fn build_engine(h: &ProjectHandle) -> Engine {
         let root = s.project.root.clone();
         s.project.all_clips().filter(|(c, _, _)| *c == root).map(|(_, _, c)| Dynamic::from(c.id.clone())).collect()
     });
-    e.register_fn("assets", |h: &mut ProjectHandle| -> Array { h.0.lock().project.assets.keys().map(|k| Dynamic::from(k.clone())).collect() });
+    e.register_fn("assets", |h: &mut ProjectHandle| -> Array {
+        h.0.lock().project.assets.keys().map(|k| Dynamic::from(k.clone())).collect()
+    });
     e.register_fn("assets", |h: &mut ProjectHandle, kind: &str| -> Array {
         let s = h.0.lock();
         s.project
@@ -202,10 +221,12 @@ pub fn build_engine(h: &ProjectHandle) -> Engine {
             .map(|(k, _)| Dynamic::from(k.clone()))
             .collect()
     });
-    e.register_fn("asset", |h: &mut ProjectHandle, id: &str| -> RResult<Dynamic> { h.with(|p| ops::get_object(p, id)).map(|v| to_dyn(&v)) });
+    e.register_fn("asset", |h: &mut ProjectHandle, id: &str| -> RResult<Dynamic> {
+        h.with(|p| ops::get_object(p, id)).map(|v| to_dyn(&v))
+    });
     e.register_fn("asset_duration", |h: &mut ProjectHandle, id: &str| -> f64 {
         let s = h.0.lock();
-        s.project.assets.get(id).and_then(|a| crate::media_pool::MediaPool::duration(a)).unwrap_or(0.0)
+        s.project.assets.get(id).and_then(crate::media_pool::MediaPool::duration).unwrap_or(0.0)
     });
     e.register_fn("comp", |h: &mut ProjectHandle| -> Dynamic {
         let s = h.0.lock();
@@ -247,11 +268,13 @@ pub fn build_engine(h: &ProjectHandle) -> Engine {
     });
     let hh = h.clone();
     e.register_fn("beats_between", move |a: f64, b: f64| -> Array {
-        timing_list(&hh, "beats").into_iter().filter(|x| {
-            let v = f(x);
-            v >= a && v < b
-        })
-        .collect()
+        timing_list(&hh, "beats")
+            .into_iter()
+            .filter(|x| {
+                let v = f(x);
+                v >= a && v < b
+            })
+            .collect()
     });
     let hh = h.clone();
     e.register_fn("nearest_beat", move |t: f64| -> f64 {
@@ -280,7 +303,9 @@ pub fn build_engine(h: &ProjectHandle) -> Engine {
     let hh = h.clone();
     e.register_fn("rand", move |a: f64, b: f64| a + (b - a) * next_rand(&mut hh.0.lock().rng));
     let hh = h.clone();
-    e.register_fn("rand_int", move |a: i64, b: i64| -> i64 { a + (next_rand(&mut hh.0.lock().rng) * ((b - a + 1).max(1)) as f64).floor() as i64 });
+    e.register_fn("rand_int", move |a: i64, b: i64| -> i64 {
+        a + (next_rand(&mut hh.0.lock().rng) * ((b - a + 1).max(1)) as f64).floor() as i64
+    });
     let hh = h.clone();
     e.register_fn("choose", move |arr: Array| -> Dynamic {
         if arr.is_empty() {
@@ -365,7 +390,9 @@ pub fn build_engine(h: &ProjectHandle) -> Engine {
     e.register_fn("pulse_keys", |times: Array, base: Dynamic, peak: Dynamic, attack: f64, release: f64, ease: &str| -> Map {
         pulse_keys(&times, &base, &peak, attack, release, ease)
     });
-    e.register_fn("pulse_keys", |times: Array, base: Dynamic, peak: Dynamic, release: f64| -> Map { pulse_keys(&times, &base, &peak, 0.0, release, "ease_out_cubic") });
+    e.register_fn("pulse_keys", |times: Array, base: Dynamic, peak: Dynamic, release: f64| -> Map {
+        pulse_keys(&times, &base, &peak, 0.0, release, "ease_out_cubic")
+    });
     e.register_fn("add_fx", |clip: &mut Map, fx: Map| {
         let list = clip.entry("effects".into()).or_insert_with(|| Dynamic::from_array(vec![]));
         if let Some(mut arr) = list.write_lock::<Array>() {
@@ -419,8 +446,12 @@ pub fn build_engine(h: &ProjectHandle) -> Engine {
     });
     e.register_fn("ease_value", |name: &str, x: f64| ease_of(name).apply(x, 1.0));
     // keyframes for a single hit: base before `at`, jump to `peak` at `at`, settle to base after `dur`
-    e.register_fn("hit_keys", |at: f64, base: Dynamic, peak: Dynamic, dur: f64, ease: &str| -> Map { hit_keys(at, &base, &peak, dur, ease) });
-    e.register_fn("hit_keys", |at: f64, base: Dynamic, peak: Dynamic, dur: f64| -> Map { hit_keys(at, &base, &peak, dur, "ease_out_expo") });
+    e.register_fn("hit_keys", |at: f64, base: Dynamic, peak: Dynamic, dur: f64, ease: &str| -> Map {
+        hit_keys(at, &base, &peak, dur, ease)
+    });
+    e.register_fn("hit_keys", |at: f64, base: Dynamic, peak: Dynamic, dur: f64| -> Map {
+        hit_keys(at, &base, &peak, dur, "ease_out_expo")
+    });
     // times from ctx: on = beats | downbeats | drops | accents | half (every other beat) | bars2 (every 2 bars)
     e.register_fn("pick_times", |ctx: Map, on: &str, every: f64| -> Array { pick_times(&ctx, on, every.round() as i64) });
     e.register_fn("pick_times", |ctx: Map, on: &str, every: i64| -> Array { pick_times(&ctx, on, every) });
@@ -485,7 +516,9 @@ fn pick_times(ctx: &Map, on: &str, every: i64) -> Array {
 }
 
 fn hit_keys(at: f64, base: &Dynamic, peak: &Dynamic, dur: f64, ease: &str) -> Map {
-    let mk = |t: f64, v: &Dynamic, e: &str| -> Dynamic { Dynamic::from_array(vec![Dynamic::from_float(t), v.clone(), Dynamic::from(e.to_string())]) };
+    let mk = |t: f64, v: &Dynamic, e: &str| -> Dynamic {
+        Dynamic::from_array(vec![Dynamic::from_float(t), v.clone(), Dynamic::from(e.to_string())])
+    };
     let mut keys = vec![];
     if at > 0.0 {
         keys.push(mk((at - 1e-3).max(0.0), base, "hold"));
@@ -501,11 +534,13 @@ fn pulse_keys(times: &Array, base: &Dynamic, peak: &Dynamic, attack: f64, releas
     let mut ts: Vec<f64> = times.iter().map(f).collect();
     ts.sort_by(|a, b| a.total_cmp(b));
     let mut keys: Vec<Dynamic> = vec![];
-    let mk = |t: f64, v: &Dynamic, e: &str| -> Dynamic { Dynamic::from_array(vec![Dynamic::from_float(t), v.clone(), Dynamic::from(e.to_string())]) };
-    if let Some(first) = ts.first() {
-        if *first - attack > 0.0 {
-            keys.push(mk((first - attack - 1e-3).max(0.0), base, "hold"));
-        }
+    let mk = |t: f64, v: &Dynamic, e: &str| -> Dynamic {
+        Dynamic::from_array(vec![Dynamic::from_float(t), v.clone(), Dynamic::from(e.to_string())])
+    };
+    if let Some(first) = ts.first()
+        && *first - attack > 0.0
+    {
+        keys.push(mk((first - attack - 1e-3).max(0.0), base, "hold"));
     }
     for (i, t) in ts.iter().enumerate() {
         let next = ts.get(i + 1).copied().unwrap_or(f64::MAX);
@@ -592,9 +627,8 @@ pub fn run_preset(
     if let Some(c) = &clip {
         scope.push("clip", to_dyn(&serde_json::to_value(c)?));
     }
-    let result = engine
-        .eval_with_scope::<Dynamic>(&mut scope, def.script())
-        .map_err(|e| anyhow::anyhow!("preset '{}' failed: {e}", def.id))?;
+    let result =
+        engine.eval_with_scope::<Dynamic>(&mut scope, def.script()).map_err(|e| anyhow::anyhow!("preset '{}' failed: {e}", def.id))?;
     let clip_out = scope.get_value::<Dynamic>("clip");
     drop(scope);
     drop(engine);
@@ -619,7 +653,13 @@ pub fn run_preset(
 }
 
 /// Run arbitrary agent code with the timeline environment.
-pub fn run_script(project: Project, lib: Arc<Library>, services: Arc<dyn ScriptServices>, code: &str, args: Json) -> anyhow::Result<ScriptOutcome> {
+pub fn run_script(
+    project: Project,
+    lib: Arc<Library>,
+    services: Arc<dyn ScriptServices>,
+    code: &str,
+    args: Json,
+) -> anyhow::Result<ScriptOutcome> {
     let ctx = ctx_map(&project, None, None);
     let handle = ProjectHandle(Arc::new(Mutex::new(ScriptState { project, lib, logs: vec![], services, depth: 0, rng: 0x5EED })));
     let engine = build_engine(&handle);
@@ -682,7 +722,8 @@ mod tests {
     #[test]
     fn clip_preset_edits_clip() {
         let mut p = Project::new("t", 640, 360, 24.0, 8.0);
-        let id = ops::add_clip(&mut p, None, ops::TrackTarget::New, json!({"source": {"type": "solid", "color": "red"}, "duration": 2})).unwrap();
+        let id = ops::add_clip(&mut p, None, ops::TrackTarget::New, json!({"source": {"type": "solid", "color": "red"}, "duration": 2}))
+            .unwrap();
         let src = r#"//! id = "test_punch"
 //! scope = "clip"
 //! params = [ { name = "strength", type = "float", default = 0.3 } ]
@@ -690,7 +731,9 @@ clip.transform = #{ scale: keys([[0.0, 1.0 + args.strength], [0.3, 1.0, "punch"]
 clip.add_fx(fx("rgb_split", #{ amount: pulse_keys([0.0], 0.0, 20.0, 0.25) }));
 "#;
         let def = PresetDef::parse(src, "x", false).unwrap();
-        let out = run_preset(p, Arc::new(Library::builtin().clone()), Arc::new(NoServices), &def, Some(&id), &Default::default(), None, 0, 1).unwrap();
+        let out =
+            run_preset(p, Arc::new(Library::builtin().clone()), Arc::new(NoServices), &def, Some(&id), &Default::default(), None, 0, 1)
+                .unwrap();
         let c = out.project.clip(&id).unwrap();
         assert!(c.transform.scale.is_animated());
         assert_eq!(c.effects.len(), 1);

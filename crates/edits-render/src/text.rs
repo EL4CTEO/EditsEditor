@@ -150,15 +150,26 @@ impl TextRenderer {
                 Family::Name(n) => n.to_string(),
                 other => fs.db().family_name(&other).to_string(),
             };
-            let has = |db: &cosmic_text::fontdb::Database, n: &str| db.faces().any(|f| f.families.iter().any(|(x, _)| x.eq_ignore_ascii_case(n)));
+            let has =
+                |db: &cosmic_text::fontdb::Database, n: &str| db.faces().any(|f| f.families.iter().any(|(x, _)| x.eq_ignore_ascii_case(n)));
             if !has(fs.db(), &fam_name) {
                 // resolve through the matcher (handles generic names and missing families)
                 let q = cosmic_text::fontdb::Query { families: &[fam, Family::SansSerif], ..Default::default() };
                 let resolved = fs.db().query(&q).and_then(|id| fs.db().face(id)).and_then(|f| f.families.first().map(|(n, _)| n.clone()));
-                let fallback = fs.db().faces().find(|f| f.families.iter().any(|(n, _)| {
-                    let l = n.to_ascii_lowercase();
-                    l.contains("segoe ui") || l.contains("noto sans") || l.contains("dejavu sans") || l.contains("liberation sans") || l == "arial"
-                })).and_then(|f| f.families.first().map(|(n, _)| n.clone()));
+                let fallback = fs
+                    .db()
+                    .faces()
+                    .find(|f| {
+                        f.families.iter().any(|(n, _)| {
+                            let l = n.to_ascii_lowercase();
+                            l.contains("segoe ui")
+                                || l.contains("noto sans")
+                                || l.contains("dejavu sans")
+                                || l.contains("liberation sans")
+                                || l == "arial"
+                        })
+                    })
+                    .and_then(|f| f.families.first().map(|(n, _)| n.clone()));
                 if let Some(r) = resolved.or(fallback) {
                     fam_name = r;
                 }
@@ -171,10 +182,11 @@ impl TextRenderer {
                 .map(|f| f.weight.0)
                 .min_by_key(|w| (*w as i32 - want).abs() * 2 + if (*w as i32) < want { 1 } else { 0 })
                 .unwrap_or(src.weight);
-            let attrs = Attrs::new()
-                .family(Family::Name(&fam_name))
-                .weight(Weight(weight))
-                .style(if src.italic { Style::Italic } else { Style::Normal });
+            let attrs = Attrs::new().family(Family::Name(&fam_name)).weight(Weight(weight)).style(if src.italic {
+                Style::Italic
+            } else {
+                Style::Normal
+            });
             buf.set_text(&text, &attrs, Shaping::Advanced, None);
             buf.shape_until_scroll(fs, false);
             // char/word indices by byte offset
@@ -245,7 +257,8 @@ impl TextRenderer {
         let block_w = lay.lines.iter().map(|l| l.w + line_extra(l)).fold(0.0, f32::max).max(1.0);
         let block_h = lay.height.max(size);
         let stroke_w = src.stroke.as_ref().map(|s| s.width as f32).unwrap_or(0.0);
-        let (sh_off, sh_blur) = src.shadow.as_ref().map(|s| ((s.offset.x().abs().max(s.offset.y().abs())) as f32, s.blur as f32)).unwrap_or((0.0, 0.0));
+        let (sh_off, sh_blur) =
+            src.shadow.as_ref().map(|s| ((s.offset.x().abs().max(s.offset.y().abs())) as f32, s.blur as f32)).unwrap_or((0.0, 0.0));
         let anim_margin = src.animator.as_ref().map(|a| {
             let from = a.from.offset.x().abs().max(a.from.offset.y().abs()) as f32;
             let out = a.out.as_ref().map(|o| o.to.offset.x().abs().max(o.to.offset.y().abs()) as f32).unwrap_or(0.0);
@@ -305,7 +318,11 @@ impl TextRenderer {
                     };
                     let oi = order(unit);
                     let delay = a.start + oi * a.stagger;
-                    let pr = if a.duration <= 0.0 { if p.time >= delay { 1.0 } else { 0.0 } } else { ((p.time - delay) / a.duration).clamp(0.0, 1.0) };
+                    let pr = if a.duration <= 0.0 {
+                        if p.time >= delay { 1.0 } else { 0.0 }
+                    } else {
+                        ((p.time - delay) / a.duration).clamp(0.0, 1.0)
+                    };
                     let e = a.ease.apply(pr, a.duration);
                     op = a.from.opacity + (1.0 - a.from.opacity) * e;
                     dx = a.from.offset.x() * (1.0 - e);
@@ -315,7 +332,11 @@ impl TextRenderer {
                     if let Some(o) = &a.out {
                         let total = (nu as f64 - 1.0) * o.stagger + o.duration;
                         let od = (p.duration - total).max(0.0) + oi * o.stagger;
-                        let q = if o.duration <= 0.0 { if p.time >= od { 1.0 } else { 0.0 } } else { ((p.time - od) / o.duration).clamp(0.0, 1.0) };
+                        let q = if o.duration <= 0.0 {
+                            if p.time >= od { 1.0 } else { 0.0 }
+                        } else {
+                            ((p.time - od) / o.duration).clamp(0.0, 1.0)
+                        };
                         let e2 = o.ease.apply(q, o.duration);
                         op += (o.to.opacity - op) * e2;
                         dx += o.to.offset.x() * e2;
@@ -350,7 +371,8 @@ impl TextRenderer {
                 let (cs, sn) = ((-rot.to_radians()).cos() as f32, (-rot.to_radians()).sin() as f32);
                 let inv_s = 1.0 / sc.max(0.01) as f32;
                 // destination bbox
-                let corners = [(x0, y0), (x0 + pl.width as f32, y0), (x0, y0 + pl.height as f32), (x0 + pl.width as f32, y0 + pl.height as f32)];
+                let corners =
+                    [(x0, y0), (x0 + pl.width as f32, y0), (x0, y0 + pl.height as f32), (x0 + pl.width as f32, y0 + pl.height as f32)];
                 let fwd = |x: f32, y: f32| -> (f32, f32) {
                     let (rx, ry) = ((x - cx) * sc as f32, (y - cy) * sc as f32);
                     let (c2, s2) = (rot.to_radians().cos() as f32, rot.to_radians().sin() as f32);

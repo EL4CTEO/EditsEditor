@@ -178,11 +178,7 @@ pub fn mix(clips: &[MixClip], t0: f64, t1: f64) -> AudioBuffer {
     let f0 = (t0 * sr).round() as usize;
     let f1 = (t1 * sr).round() as usize;
     let n = f1.saturating_sub(f0);
-    let rendered: Vec<(usize, Vec<f32>)> = clips
-        .par_iter()
-        .filter(|c| c.end > t0 && c.start < t1)
-        .map(|c| render_clip(c, sr))
-        .collect();
+    let rendered: Vec<(usize, Vec<f32>)> = clips.par_iter().filter(|c| c.end > t0 && c.start < t1).map(|c| render_clip(c, sr)).collect();
     let mut out = vec![0f32; n * 2];
     for (start, data) in rendered {
         let frames = data.len() / 2;

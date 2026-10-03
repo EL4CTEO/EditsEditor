@@ -87,12 +87,7 @@ pub fn lerp(a: f64, b: f64, t: f64) -> f64 {
 pub struct Mat4(pub [[f64; 4]; 4]);
 
 impl Mat4 {
-    pub const IDENTITY: Mat4 = Mat4([
-        [1.0, 0.0, 0.0, 0.0],
-        [0.0, 1.0, 0.0, 0.0],
-        [0.0, 0.0, 1.0, 0.0],
-        [0.0, 0.0, 0.0, 1.0],
-    ]);
+    pub const IDENTITY: Mat4 = Mat4([[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]]);
 
     pub fn mul(&self, o: &Mat4) -> Mat4 {
         let mut r = [[0.0; 4]; 4];

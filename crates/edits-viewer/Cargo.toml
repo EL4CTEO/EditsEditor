@@ -29,3 +29,6 @@ eframe = { workspace = true, features = ["x11", "wayland"] }
 [target.'cfg(windows)'.dependencies]
 cpal.workspace = true
 rfd.workspace = true
+
+[lints]
+workspace = true

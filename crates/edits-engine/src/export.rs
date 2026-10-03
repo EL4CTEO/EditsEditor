@@ -42,10 +42,17 @@ pub struct Progress {
 
 impl Engine {
     /// Export the root composition (or `comp`). `progress` returns false to cancel.
-    pub fn export(&mut self, comp: Option<&str>, settings: &ExportSettings, cancel: Option<Arc<AtomicBool>>, mut progress: impl FnMut(&Progress)) -> Result<ExportReport> {
+    pub fn export(
+        &mut self,
+        comp: Option<&str>,
+        settings: &ExportSettings,
+        cancel: Option<Arc<AtomicBool>>,
+        mut progress: impl FnMut(&Progress),
+    ) -> Result<ExportReport> {
         let start = Instant::now();
         let comp_id = comp.map(String::from).unwrap_or_else(|| self.project.root.clone());
-        let c = self.project.compositions.get(&comp_id).cloned().ok_or_else(|| EngineError::NotFound(format!("composition '{comp_id}'")))?;
+        let c =
+            self.project.compositions.get(&comp_id).cloned().ok_or_else(|| EngineError::NotFound(format!("composition '{comp_id}'")))?;
         let (t0, t1) = match settings.range {
             Some([a, b]) => (a.max(0.0), b.min(c.duration).max(a)),
             None => (0.0, c.duration),
