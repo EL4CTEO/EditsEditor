@@ -11,6 +11,8 @@ pub mod shape;
 pub mod text;
 pub mod transform;
 
+pub use wgpu;
+
 pub use gpu::{GpuContext, GpuOptions};
 pub use renderer::{EffectCall, FrameCtx, Globals, MaskParams, OutputMode, PendingReadback, Renderer, Tex};
 pub use text::{TextFrameParams, TextRenderer};

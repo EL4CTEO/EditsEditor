@@ -374,11 +374,16 @@ impl Engine {
                         entries.sort();
                         for e in entries {
                             if e.is_dir() {
-                                if opts.recursive {
+                                let hidden = e.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.starts_with('.'));
+                                if opts.recursive && !hidden {
                                     stack.push(e);
                                 }
-                            } else if edits_media::probe::guess_kind(&e.to_string_lossy()) != AssetKind::Auto {
-                                out.push(e);
+                            } else {
+                                let name = e.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                                let skip = name.ends_with(".edits.json") || name.ends_with(".json.tmp") || name.starts_with('.') || name.contains(".preview.");
+                                if !skip && edits_media::probe::guess_kind(&e.to_string_lossy()) != AssetKind::Auto {
+                                    out.push(e);
+                                }
                             }
                         }
                     }
@@ -636,6 +641,39 @@ impl Engine {
         Ok(RenderedFrame { frame, time: t, ms: start.elapsed().as_secs_f64() * 1000.0, warnings })
     }
 
+    /// Render directly into a texture view (zero-copy display in the viewer). Returns warnings.
+    pub fn render_to_view(&mut self, comp: Option<&str>, t: f64, view: &edits_render::wgpu::TextureView, format: edits_render::wgpu::TextureFormat, mode: OutputMode) -> Result<Vec<String>> {
+        let comp_id = comp.map(String::from).unwrap_or_else(|| self.project.root.clone());
+        if !self.project.compositions.contains_key(&comp_id) {
+            return Err(EngineError::NotFound(format!("composition '{comp_id}'")));
+        }
+        self.ensure_fonts();
+        let lib = self.library();
+        let timing = self.timing_data();
+        let vars = Arc::new(self.project.variables.clone());
+        self.renderer()?;
+        let Engine { renderer, media, project, text, expr, .. } = self;
+        let renderer = renderer.as_mut().unwrap();
+        let mut ctx = EvalCtx {
+            project,
+            lib: &lib,
+            media,
+            text,
+            expr,
+            timing,
+            vars,
+            warnings: RefCell::new(vec![]),
+            expr_errors: Default::default(),
+            root_time: t,
+        };
+        let mut f = renderer.frame();
+        let out = ctx.render_comp(&mut f, &comp_id, t, 0)?;
+        f.present_to(out, view, format, mode)?;
+        let mut w = ctx.warnings.into_inner();
+        w.extend(ctx.expr_errors.borrow().iter().cloned());
+        Ok(w)
+    }
+
     /// Render several times and tile them into a labeled contact sheet.
     pub fn contact_sheet(&mut self, comp: Option<&str>, times: &[f64], columns: u32, thumb_width: u32) -> Result<(Frame, Vec<String>)> {
         let mut thumbs = vec![];
@@ -762,6 +800,56 @@ impl Engine {
         Ok(Frame::new(w, h, img.into_raw(), false))
     }
 
+    /// Render an effect on a frame of the edit (or a test card if the project is empty), so an
+    /// agent can see what it does before using it. Transitions are shown at `progress`.
+    pub fn preview_effect(&mut self, effect: &str, params: &serde_json::Map<String, Json>, time: Option<f64>, progress: f64) -> Result<Frame> {
+        let lib = self.library();
+        let def = lib.effect(effect).cloned().ok_or_else(|| EngineError::NotFound(format!("effect '{effect}'")))?;
+        let comp = self.project.root_comp().cloned().ok_or_else(|| EngineError::NotFound("root composition".into()))?;
+        let (w, h) = (comp.width, comp.height);
+        let has_content = comp.tracks.iter().any(|t| !t.clips.is_empty());
+        let t = time.unwrap_or(comp.duration / 2.0);
+        let base = if has_content { Some(self.render_frame(None, t, OutputMode::Over([0.0, 0.0, 0.0, 1.0]))?.frame) } else { None };
+        let card = test_card(w, h);
+        let second = test_card_alt(w, h);
+        let props: indexmap::IndexMap<String, edits_core::Property<edits_core::Value>> =
+            serde_json::from_value(Json::Object(params.clone())).map_err(|e| EngineError::Invalid(format!("bad params: {e}")))?;
+        for k in props.keys() {
+            if def.param(k).is_none() {
+                return Err(EngineError::Invalid(format!("effect '{effect}' has no param '{k}'")));
+            }
+        }
+        let slots: Vec<[f32; 4]> = def
+            .slot_params()
+            .map(|p| {
+                let v = props.get(&p.name).map(|pr| pr.sample(0.0, &p.default)).unwrap_or_else(|| p.default.clone());
+                p.to_slot(&v)
+            })
+            .collect();
+        let timing = self.timing_data();
+        let r = self.renderer()?;
+        let mut f = r.frame();
+        let a = f.upload(None, base.as_ref().unwrap_or(&card));
+        let b = f.upload(None, &second);
+        let g = edits_render::Globals {
+            time: t as f32,
+            local_time: t as f32,
+            progress: progress as f32,
+            duration: 2.0,
+            bpm: timing.bpm as f32,
+            beat_time: 0.05,
+            seed: 0.37,
+            ..Default::default()
+        };
+        let (input, input2) = match def.kind {
+            edits_fx::EffectKind::Filter => (Some(a), None),
+            edits_fx::EffectKind::Transition => (Some(a), Some(b)),
+            edits_fx::EffectKind::Generator => (None, None),
+        };
+        let out = f.effect(edits_render::EffectCall { def: &def, params: &slots, globals: g, input, input2, extra: None, size: (w, h) })?;
+        Ok(f.read(out, OutputMode::Over([0.0, 0.0, 0.0, 1.0]))?)
+    }
+
     // ------------------------------------------------------------------------------------------
     // Presets & scripts
     // ------------------------------------------------------------------------------------------
@@ -875,6 +963,39 @@ impl Engine {
             "presets": self.library.preset_count(),
         })
     }
+}
+
+/// Colorful test card used when there is nothing to preview.
+pub fn test_card(w: u32, h: u32) -> Frame {
+    let mut d = Vec::with_capacity((w * h * 4) as usize);
+    for y in 0..h {
+        for x in 0..w {
+            let u = x as f32 / w as f32;
+            let v = y as f32 / h as f32;
+            let cx = u - 0.5;
+            let cy = (v - 0.5) * h as f32 / w as f32;
+            let r = (cx * cx + cy * cy).sqrt();
+            let ring = ((r * 40.0).sin() * 0.5 + 0.5) * (1.0 - (r * 2.2).min(1.0));
+            let checker = (((x / 32) + (y / 32)) % 2) as f32;
+            let col = [
+                (0.5 + 0.5 * (u * 6.28).sin()) * 0.8 + ring * 0.6,
+                (0.5 + 0.5 * (v * 6.28 + 2.0).sin()) * 0.7 + checker * 0.1,
+                (0.5 + 0.5 * ((u + v) * 6.28 + 4.0).sin()) * 0.9 + ring * 0.3,
+            ];
+            d.extend(col.iter().map(|c| (c.clamp(0.0, 1.0) * 255.0) as u8));
+            d.push(255);
+        }
+    }
+    Frame::new(w, h, d, false)
+}
+
+fn test_card_alt(w: u32, h: u32) -> Frame {
+    let mut f = test_card(w, h);
+    for px in f.data.chunks_exact_mut(4) {
+        px.swap(0, 2);
+        px[1] = 255 - px[1];
+    }
+    f
 }
 
 fn collect_exprs(v: &Json, out: &mut Vec<String>) {

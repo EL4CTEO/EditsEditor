@@ -23,6 +23,7 @@ fn lut_sample(c: vec3f, n: f32) -> vec3f {
     return mix(a, b, fb);
 }
 fn effect(uv: vec2f, p: Params) -> vec4f {
+    if (textureDimensions(t2).x < 4u) { return src_clamp(uv); }
     let c = grade_begin(src_clamp(uv));
     let l = lut_sample(c.rgb, max(p.size, 2.0));
     return grade_end(vec4f(mix(c.rgb, l, p.amount), c.a));

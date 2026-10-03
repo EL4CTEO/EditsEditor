@@ -1,6 +1,26 @@
 [package]
 name = "edits-cli"
-version = "0.1.0"
-edition = "2024"
+description = "EditsEditor command line: MCP server, rendering, export, project tools"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "edits"
+path = "src/main.rs"
 
 [dependencies]
+edits-core.workspace = true
+edits-fx.workspace = true
+edits-media.workspace = true
+edits-audio.workspace = true
+edits-render.workspace = true
+edits-engine.workspace = true
+edits-mcp.workspace = true
+clap.workspace = true
+tokio.workspace = true
+anyhow.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
