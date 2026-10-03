@@ -1,0 +1,26 @@
+[package]
+name = "edits-media"
+description = "Media probing, decoding, encoding and analysis (FFmpeg pipes, images, SVG) for EditsEditor"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+edits-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+parking_lot.workspace = true
+crossbeam-channel.workspace = true
+lru.workspace = true
+image.workspace = true
+resvg.workspace = true
+which.workspace = true
+glob.workspace = true
+rayon.workspace = true
+schemars.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
