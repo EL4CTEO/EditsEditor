@@ -162,6 +162,9 @@ pub fn register_common(engine: &mut Engine) {
     });
     engine.register_fn("remap", |x: f64, a: f64, b: f64, c: f64, d: f64| c + (x - a) * (d - c) / (b - a));
     engine.register_fn("fract", |x: f64| x - x.floor());
+    engine.register_fn("max", |a: f64, b: f64| a.max(b));
+    engine.register_fn("min", |a: f64, b: f64| a.min(b));
+    engine.register_fn("pow", |a: f64, b: f64| a.powf(b));
     engine.register_fn("fmod", |x: f64, y: f64| x.rem_euclid(y));
     engine.register_fn("sign", |x: f64| x.signum());
     engine.register_fn("deg", |x: f64| x.to_degrees());

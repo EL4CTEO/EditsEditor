@@ -408,6 +408,42 @@ pub fn build_engine(h: &ProjectHandle) -> Engine {
         }
     });
     e.register_fn("ease_value", |name: &str, x: f64| ease_of(name).apply(x, 1.0));
+    // keyframes for a single hit: base before `at`, jump to `peak` at `at`, settle to base after `dur`
+    e.register_fn("hit_keys", |at: f64, base: Dynamic, peak: Dynamic, dur: f64, ease: &str| -> Map { hit_keys(at, &base, &peak, dur, ease) });
+    e.register_fn("hit_keys", |at: f64, base: Dynamic, peak: Dynamic, dur: f64| -> Map { hit_keys(at, &base, &peak, dur, "ease_out_expo") });
+    // times from ctx: on = beats | downbeats | drops | accents | half (every other beat) | bars2 (every 2 bars)
+    e.register_fn("pick_times", |ctx: Map, on: &str, every: f64| -> Array { pick_times(&ctx, on, every.round() as i64) });
+    e.register_fn("pick_times", |ctx: Map, on: &str, every: i64| -> Array { pick_times(&ctx, on, every) });
+    #[allow(unused)]
+    let _old = |ctx: Map, on: &str, every: i64| -> Array {
+        let get = |k: &str| ctx.get(k).and_then(|v| v.clone().try_cast::<Array>()).unwrap_or_default();
+        let list = match on {
+            "downbeats" | "bars" => get("downbeats"),
+            "drops" => get("drops"),
+            "accents" => get("accents"),
+            "half" => get("beats").into_iter().step_by(2).collect(),
+            "bars2" => get("downbeats").into_iter().step_by(2).collect(),
+            _ => get("beats"),
+        };
+        list.into_iter().step_by(every.max(1) as usize).collect()
+    };
+    e.register_fn("every", |arr: Array, n: i64| -> Array { arr.into_iter().step_by(n.max(1) as usize).collect() });
+    e.register_fn("every", |arr: Array, n: f64| -> Array { arr.into_iter().step_by((n.round() as usize).max(1)).collect() });
+    e.register_fn("dir_vec", |name: &str, dist: f64| -> Array {
+        let (x, y) = match name {
+            "left" => (-dist, 0.0),
+            "right" => (dist, 0.0),
+            "up" | "top" => (0.0, -dist),
+            "down" | "bottom" => (0.0, dist),
+            "up_left" => (-dist * 0.707, -dist * 0.707),
+            "up_right" => (dist * 0.707, -dist * 0.707),
+            "down_left" => (-dist * 0.707, dist * 0.707),
+            "down_right" => (dist * 0.707, dist * 0.707),
+            _ => (-dist, 0.0),
+        };
+        vec![Dynamic::from_float(x), Dynamic::from_float(y)]
+    });
+    e.register_fn("has", |m: &mut Map, k: &str| m.contains_key(k));
     e.register_fn("to_json", |d: Dynamic| -> String { serde_json::to_string(&from_dyn(&d)).unwrap_or_default() });
     e.register_fn("parse_json", |s: &str| -> Dynamic { serde_json::from_str::<Json>(s).map(|v| to_dyn(&v)).unwrap_or(Dynamic::UNIT) });
     e
@@ -425,18 +461,50 @@ fn json_edit(m: &mut Map, f: impl FnOnce(&mut Json) -> Result<(), String>) -> RR
     }
 }
 
+fn pick_times(ctx: &Map, on: &str, every: i64) -> Array {
+    let get = |k: &str| ctx.get(k).and_then(|v| v.clone().try_cast::<Array>()).unwrap_or_default();
+    let list = match on {
+        "downbeats" | "bars" => get("downbeats"),
+        "drops" => get("drops"),
+        "accents" => get("accents"),
+        "half" => get("beats").into_iter().step_by(2).collect(),
+        "bars2" => get("downbeats").into_iter().step_by(2).collect(),
+        _ => get("beats"),
+    };
+    list.into_iter().step_by(every.max(1) as usize).collect()
+}
+
+fn hit_keys(at: f64, base: &Dynamic, peak: &Dynamic, dur: f64, ease: &str) -> Map {
+    let mk = |t: f64, v: &Dynamic, e: &str| -> Dynamic { Dynamic::from_array(vec![Dynamic::from_float(t), v.clone(), Dynamic::from(e.to_string())]) };
+    let mut keys = vec![];
+    if at > 0.0 {
+        keys.push(mk((at - 1e-3).max(0.0), base, "hold"));
+    }
+    keys.push(mk(at.max(0.0), peak, ease));
+    keys.push(mk(at.max(0.0) + dur.max(1e-3), base, "linear"));
+    let mut m = Map::new();
+    m.insert("keyframes".into(), Dynamic::from_array(keys));
+    m
+}
+
 fn pulse_keys(times: &Array, base: &Dynamic, peak: &Dynamic, attack: f64, release: f64, ease: &str) -> Map {
     let mut ts: Vec<f64> = times.iter().map(f).collect();
     ts.sort_by(|a, b| a.total_cmp(b));
     let mut keys: Vec<Dynamic> = vec![];
     let mk = |t: f64, v: &Dynamic, e: &str| -> Dynamic { Dynamic::from_array(vec![Dynamic::from_float(t), v.clone(), Dynamic::from(e.to_string())]) };
+    if let Some(first) = ts.first() {
+        if *first - attack > 0.0 {
+            keys.push(mk((first - attack - 1e-3).max(0.0), base, "hold"));
+        }
+    }
     for (i, t) in ts.iter().enumerate() {
         let next = ts.get(i + 1).copied().unwrap_or(f64::MAX);
         if attack > 0.0 {
             keys.push(mk((t - attack).max(0.0), base, "ease_in_quad"));
         }
         keys.push(mk(*t, peak, ease));
-        keys.push(mk((t + release).min(next - 1e-3).max(*t + 1e-3), base, "linear"));
+        let end = (t + release).min(next - attack - 1e-3).max(*t + 1e-3);
+        keys.push(mk(end, base, "hold"));
     }
     let mut m = Map::new();
     m.insert("keyframes".into(), Dynamic::from_array(keys));
@@ -524,6 +592,11 @@ pub fn run_preset(
     let mut project = state.project;
     if let (Some(c), Some(d)) = (&clip, clip_out) {
         let mut j = from_dyn(&d);
+        let original = serde_json::to_value(c)?;
+        if j == original {
+            ops::assign_missing_ids(&mut project);
+            return Ok(ScriptOutcome { project, logs: state.logs, result: from_dyn(&result) });
+        }
         if let Some(o) = j.as_object_mut() {
             o.insert("id".into(), Json::String(c.id.clone()));
         }

@@ -65,6 +65,8 @@ pub enum ParamType {
     Image,
     /// .cube LUT asset id, bound to texture `t2` unwrapped as a 2D strip.
     Lut,
+    /// Free text (presets only; not passed to shaders).
+    String,
 }
 
 impl ParamType {
@@ -74,7 +76,7 @@ impl ParamType {
             ParamType::Vec2 | ParamType::Point => ("vec2f", ".xy"),
             ParamType::Vec3 => ("vec3f", ".xyz"),
             ParamType::Color => ("vec4f", ""),
-            ParamType::Image | ParamType::Lut => return None,
+            ParamType::Image | ParamType::Lut | ParamType::String => return None,
         })
     }
 }
@@ -133,7 +135,7 @@ impl ParamDef {
                     a,
                 ]
             }
-            ParamType::Image | ParamType::Lut => [0.0; 4],
+            ParamType::Image | ParamType::Lut | ParamType::String => [0.0; 4],
         }
     }
 
@@ -269,7 +271,7 @@ impl EffectDef {
             }
             if p.is_texture() {
                 textures += 1;
-            } else {
+            } else if p.ty != ParamType::String {
                 slots += 1;
             }
             if p.ty == ParamType::Enum && p.options.is_empty() {
@@ -317,7 +319,7 @@ impl EffectDef {
 
     /// Params that occupy uniform slots, in slot order.
     pub fn slot_params(&self) -> impl Iterator<Item = &ParamDef> {
-        self.params.iter().filter(|p| !p.is_texture())
+        self.params.iter().filter(|p| p.ty.wgsl().is_some())
     }
 
     pub fn texture_param(&self) -> Option<&ParamDef> {
