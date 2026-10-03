@@ -1,0 +1,2670 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Project",
+  "description": "Root of an EditsEditor project file.",
+  "type": "object",
+  "properties": {
+    "version": {
+      "description": "File format version.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0,
+      "default": 1
+    },
+    "meta": {
+      "$ref": "#/$defs/ProjectMeta",
+      "default": {}
+    },
+    "root": {
+      "description": "Id of the composition that is rendered/exported.",
+      "type": "string",
+      "default": "main"
+    },
+    "compositions": {
+      "description": "Compositions by id. Compositions can be nested via `{\"type\": \"comp\"}` clip sources.",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/Composition"
+      }
+    },
+    "assets": {
+      "description": "Imported media and resource files by id.",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/Asset"
+      }
+    },
+    "timing": {
+      "description": "Musical timing (beats, drops, sections) used by expressions, snapping and presets.",
+      "$ref": "#/$defs/Timing"
+    },
+    "custom_effects": {
+      "description": "Project-defined custom effects (WGSL), same format as built-in effects.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "custom_presets": {
+      "description": "Project-defined presets (Rhai scripts with a `//!` TOML header), same format as built-ins.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "variables": {
+      "description": "Global variables readable from expressions via `var(\"name\")`.",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/Value"
+      }
+    },
+    "script_library": {
+      "description": "Shared Rhai function library available to every expression and script.",
+      "type": "string"
+    },
+    "id_counter": {
+      "description": "Counter for generated ids (`c12`, `fx7`, ...).",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0,
+      "default": 0
+    }
+  },
+  "required": [
+    "compositions"
+  ],
+  "$defs": {
+    "ProjectMeta": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "author": {
+          "type": "string"
+        },
+        "notes": {
+          "description": "Free-form notes (e.g. the agent's plan for the edit).",
+          "type": "string"
+        }
+      }
+    },
+    "Composition": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "default": ""
+        },
+        "width": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "height": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "fps": {
+          "description": "Frames per second (e.g. 23.976, 24, 30, 60).",
+          "type": "number",
+          "format": "double"
+        },
+        "duration": {
+          "description": "Duration in seconds.",
+          "type": "number",
+          "format": "double"
+        },
+        "background": {
+          "$ref": "#/$defs/Color",
+          "default": "#000000"
+        },
+        "tracks": {
+          "description": "Tracks, bottom to top: later tracks are composited over earlier ones.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Track"
+          },
+          "default": []
+        },
+        "effects": {
+          "description": "Effects applied to the final composited image of this composition.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EffectInstance"
+          }
+        },
+        "markers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Marker"
+          }
+        },
+        "motion_blur": {
+          "description": "Motion blur settings for clips that enable `motion_blur`.",
+          "$ref": "#/$defs/MotionBlur"
+        },
+        "volume": {
+          "description": "Master audio gain (linear).",
+          "$ref": "#/$defs/Property_double"
+        }
+      },
+      "required": [
+        "width",
+        "height",
+        "fps",
+        "duration"
+      ]
+    },
+    "Color": {
+      "description": "Color: '#rrggbb[aa]', CSS name, 'rgb()/rgba()/hsl()', or [r,g,b(,a)] in 0..1.",
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 4
+        }
+      ]
+    },
+    "Track": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "muted": {
+          "description": "Mute this track's audio.",
+          "type": "boolean"
+        },
+        "solo": {
+          "description": "Solo this track (audio + video): only soloed tracks render when any track is soloed.",
+          "type": "boolean"
+        },
+        "locked": {
+          "type": "boolean"
+        },
+        "opacity": {
+          "$ref": "#/$defs/Property_double"
+        },
+        "blend_mode": {
+          "$ref": "#/$defs/BlendMode"
+        },
+        "volume": {
+          "description": "Track audio gain (linear).",
+          "$ref": "#/$defs/Property_double"
+        },
+        "effects": {
+          "description": "Effects applied to this track's composited result.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EffectInstance"
+          }
+        },
+        "clips": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Clip"
+          },
+          "default": []
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "Property_double": {
+      "description": "Animatable property: a static value, or {keyframes, expr, value, loop}.",
+      "anyOf": [
+        {
+          "type": "number",
+          "format": "double"
+        },
+        {
+          "$ref": "#/$defs/Animated"
+        }
+      ]
+    },
+    "Animated": {
+      "type": "object",
+      "properties": {
+        "keyframes": {
+          "description": "Keyframes (clip-local seconds). Sorted automatically.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Keyframe_double"
+          }
+        },
+        "value": {
+          "description": "Base value when there are no keyframes (used with `expr`).",
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "expr": {
+          "description": "Rhai expression evaluated every frame. Has access to `value` (keyframed value), `t`,\n`time`, beat/audio helpers and more (see the expression reference).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "loop": {
+          "description": "Repeat the keyframed section after the last keyframe.",
+          "$ref": "#/$defs/LoopMode"
+        }
+      },
+      "additionalProperties": false
+    },
+    "Keyframe_double": {
+      "description": "Keyframe: {t, v, ease} or [t, v, ease]. t = clip-local seconds; ease shapes the segment to the next key.",
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "t": {
+              "type": "number"
+            },
+            "v": {
+              "type": "number",
+              "format": "double"
+            },
+            "ease": {
+              "$ref": "#/$defs/Easing"
+            }
+          },
+          "required": [
+            "t",
+            "v"
+          ]
+        },
+        {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 3
+        }
+      ]
+    },
+    "Easing": {
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "linear",
+            "ease_in_sine",
+            "ease_out_sine",
+            "ease_in_out_sine",
+            "ease_in_quad",
+            "ease_out_quad",
+            "ease_in_out_quad",
+            "ease_in_cubic",
+            "ease_out_cubic",
+            "ease_in_out_cubic",
+            "ease_in_quart",
+            "ease_out_quart",
+            "ease_in_out_quart",
+            "ease_in_quint",
+            "ease_out_quint",
+            "ease_in_out_quint",
+            "ease_in_expo",
+            "ease_out_expo",
+            "ease_in_out_expo",
+            "ease_in_circ",
+            "ease_out_circ",
+            "ease_in_out_circ",
+            "ease_in_back",
+            "ease_out_back",
+            "ease_in_out_back",
+            "ease_in_elastic",
+            "ease_out_elastic",
+            "ease_in_out_elastic",
+            "ease_in_bounce",
+            "ease_out_bounce",
+            "ease_in_out_bounce",
+            "smoothstep",
+            "smootherstep"
+          ]
+        },
+        {
+          "description": "Holds the current value until the next keyframe (jump cut on values).",
+          "type": "string",
+          "const": "hold"
+        },
+        {
+          "description": "CSS `ease` (0.25, 0.1, 0.25, 1).",
+          "type": "string",
+          "const": "ease"
+        },
+        {
+          "description": "Alias for `ease_in_cubic`.",
+          "type": "string",
+          "const": "ease_in"
+        },
+        {
+          "description": "Alias for `ease_out_cubic`.",
+          "type": "string",
+          "const": "ease_out"
+        },
+        {
+          "description": "Alias for `ease_in_out_cubic`.",
+          "type": "string",
+          "const": "ease_in_out"
+        },
+        {
+          "description": "Very sharp in-out curve used for velocity edits / whip moves (bezier 0.9,0,0.1,1).",
+          "type": "string",
+          "const": "whip"
+        },
+        {
+          "description": "Fast start that settles hard — great for zoom punches (bezier 0.05,0.7,0.1,1).",
+          "type": "string",
+          "const": "punch"
+        },
+        {
+          "description": "Smooth anime-edit style ease (bezier 0.7,0,0.2,1).",
+          "type": "string",
+          "const": "snap"
+        },
+        {
+          "description": "Slow-fast-slow, softer than whip (bezier 0.65,0,0.35,1).",
+          "type": "string",
+          "const": "glide"
+        },
+        {
+          "description": "Custom cubic bezier like CSS `cubic-bezier(x1, y1, x2, y2)`.",
+          "type": "object",
+          "properties": {
+            "bezier": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "format": "double"
+              },
+              "minItems": 4,
+              "maxItems": 4
+            }
+          },
+          "required": [
+            "bezier"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "description": "Stepped interpolation with N steps.",
+          "type": "object",
+          "properties": {
+            "steps": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "steps"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "description": "Overshoot (\"back\") with custom overshoot amount (default style is 1.70158).",
+          "type": "object",
+          "properties": {
+            "back": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          "required": [
+            "back"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "description": "Damped spring. Interpreted in seconds over the keyframe segment.",
+          "type": "object",
+          "properties": {
+            "spring": {
+              "$ref": "#/$defs/SpringParams"
+            }
+          },
+          "required": [
+            "spring"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "description": "Elastic with custom amplitude and period.",
+          "type": "object",
+          "properties": {
+            "elastic": {
+              "$ref": "#/$defs/ElasticParams"
+            }
+          },
+          "required": [
+            "elastic"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "SpringParams": {
+      "type": "object",
+      "properties": {
+        "stiffness": {
+          "type": "number",
+          "format": "double",
+          "default": 170.0
+        },
+        "damping": {
+          "type": "number",
+          "format": "double",
+          "default": 12.0
+        },
+        "mass": {
+          "type": "number",
+          "format": "double",
+          "default": 1.0
+        }
+      }
+    },
+    "ElasticParams": {
+      "type": "object",
+      "properties": {
+        "amplitude": {
+          "type": "number",
+          "format": "double",
+          "default": 1.0
+        },
+        "period": {
+          "type": "number",
+          "format": "double",
+          "default": 0.3
+        }
+      }
+    },
+    "LoopMode": {
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "none"
+          ]
+        },
+        {
+          "description": "Repeat keyframes from the first to the last.",
+          "type": "string",
+          "const": "cycle"
+        },
+        {
+          "description": "Play forward then backward.",
+          "type": "string",
+          "const": "ping_pong"
+        }
+      ]
+    },
+    "BlendMode": {
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "normal",
+            "add",
+            "screen",
+            "multiply",
+            "overlay",
+            "soft_light",
+            "hard_light",
+            "color_dodge",
+            "color_burn",
+            "linear_dodge",
+            "linear_burn",
+            "linear_light",
+            "vivid_light",
+            "pin_light",
+            "hard_mix",
+            "darken",
+            "lighten",
+            "darker_color",
+            "lighter_color",
+            "difference",
+            "exclusion",
+            "subtract",
+            "divide",
+            "hue",
+            "saturation",
+            "color",
+            "luminosity"
+          ]
+        },
+        {
+          "description": "Only shows where the destination has alpha (stencil).",
+          "type": "string",
+          "const": "stencil_alpha"
+        },
+        {
+          "description": "Cuts out the destination where this layer has alpha.",
+          "type": "string",
+          "const": "silhouette_alpha"
+        }
+      ]
+    },
+    "EffectInstance": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "default": ""
+        },
+        "effect": {
+          "description": "Effect id from the library (`effects_list`), or a project custom effect id.",
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "params": {
+          "description": "Parameter values by name. Missing params use the effect's defaults.",
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Property_Value"
+          }
+        },
+        "mix": {
+          "description": "Mix between the unprocessed (0) and processed (1) image.",
+          "$ref": "#/$defs/Property_double"
+        },
+        "range": {
+          "description": "Only apply within this clip-local time range [start, end] (seconds).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "number",
+            "format": "double"
+          },
+          "minItems": 2,
+          "maxItems": 2
+        }
+      },
+      "required": [
+        "effect"
+      ]
+    },
+    "Property_Value": {
+      "description": "Animatable property: a static value, or {keyframes, expr, value, loop}.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Value"
+        },
+        {
+          "$ref": "#/$defs/Animated2"
+        }
+      ]
+    },
+    "Value": {
+      "description": "A loosely-typed parameter value.\n\n- numbers: `0.5`\n- vectors / colors as arrays: `[0.2, 0.4]`, `[1, 0, 0, 1]`\n- booleans: `true`\n- strings: colors (`\"#ff00aa\"`), enum options (`\"radial\"`), asset ids, text",
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "number",
+          "format": "double"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        {
+          "type": "string"
+        }
+      ]
+    },
+    "Animated2": {
+      "type": "object",
+      "properties": {
+        "keyframes": {
+          "description": "Keyframes (clip-local seconds). Sorted automatically.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Keyframe_Value"
+          }
+        },
+        "value": {
+          "description": "Base value when there are no keyframes (used with `expr`).",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Value"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "expr": {
+          "description": "Rhai expression evaluated every frame. Has access to `value` (keyframed value), `t`,\n`time`, beat/audio helpers and more (see the expression reference).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "loop": {
+          "description": "Repeat the keyframed section after the last keyframe.",
+          "$ref": "#/$defs/LoopMode"
+        }
+      },
+      "additionalProperties": false
+    },
+    "Keyframe_Value": {
+      "description": "Keyframe: {t, v, ease} or [t, v, ease]. t = clip-local seconds; ease shapes the segment to the next key.",
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "t": {
+              "type": "number"
+            },
+            "v": {
+              "$ref": "#/$defs/Value"
+            },
+            "ease": {
+              "$ref": "#/$defs/Easing"
+            }
+          },
+          "required": [
+            "t",
+            "v"
+          ]
+        },
+        {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 3
+        }
+      ]
+    },
+    "Clip": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "start": {
+          "description": "Timeline start (seconds).",
+          "type": "number",
+          "format": "double"
+        },
+        "duration": {
+          "description": "Timeline duration (seconds).",
+          "type": "number",
+          "format": "double"
+        },
+        "source": {
+          "description": "What this clip shows/plays.",
+          "$ref": "#/$defs/ClipSource"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "hidden": {
+          "description": "Hidden clips don't render directly but can be used as mattes (`matte.clip`).",
+          "type": "boolean"
+        },
+        "in": {
+          "description": "Source in-point (seconds into the media).",
+          "type": "number",
+          "format": "double"
+        },
+        "speed": {
+          "description": "Playback speed (1 = normal, 0.25 = slow-mo, 3 = fast). Animatable: keyframing speed\ncreates smooth velocity ramps — source time is the integral of speed.",
+          "$ref": "#/$defs/Property_double"
+        },
+        "time_remap": {
+          "description": "Absolute time remap: maps clip-local time -> source time (seconds). Overrides `in`/`speed`.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Property_double"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reverse": {
+          "description": "Play the source backwards (from the out-point to the in-point).",
+          "type": "boolean"
+        },
+        "freeze": {
+          "description": "Freeze on a single source time (seconds).",
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "end_behavior": {
+          "description": "What happens when the source runs out.",
+          "$ref": "#/$defs/EndBehavior"
+        },
+        "transform": {
+          "$ref": "#/$defs/Transform"
+        },
+        "fit": {
+          "description": "How media is sized into the composition before the transform.",
+          "$ref": "#/$defs/Fit"
+        },
+        "crop": {
+          "description": "Crop in source pixels fractions: [left, top, right, bottom] in 0..1.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "number",
+            "format": "double"
+          },
+          "minItems": 4,
+          "maxItems": 4
+        },
+        "opacity": {
+          "$ref": "#/$defs/Property_double"
+        },
+        "blend_mode": {
+          "$ref": "#/$defs/BlendMode"
+        },
+        "effects": {
+          "description": "Effect stack, applied in order (in composition space, after the transform).",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EffectInstance"
+          }
+        },
+        "masks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Mask"
+          }
+        },
+        "matte": {
+          "description": "Use another clip's alpha/luma as this clip's matte.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Matte"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "transition_in": {
+          "description": "Transition from the previous clip on the same track, starting at this clip's start.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Transition"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "motion_blur": {
+          "description": "Enable sub-frame motion blur (settings on the composition).",
+          "type": "boolean"
+        },
+        "echo": {
+          "description": "Temporal echo / trails: re-renders the clip at earlier times and blends them in.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Echo"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "audio": {
+          "$ref": "#/$defs/ClipAudio"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "notes": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "start",
+        "duration",
+        "source"
+      ]
+    },
+    "ClipSource": {
+      "description": "What a clip renders.",
+      "oneOf": [
+        {
+          "description": "Any imported asset: video, image, animated image (gif/webp/apng), svg, image sequence, audio.",
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string"
+            },
+            "no_audio": {
+              "description": "Disable the asset's audio for this clip.",
+              "type": "boolean"
+            },
+            "no_video": {
+              "description": "Disable the asset's video for this clip (audio only).",
+              "type": "boolean"
+            },
+            "type": {
+              "type": "string",
+              "const": "media"
+            }
+          },
+          "required": [
+            "type",
+            "asset"
+          ]
+        },
+        {
+          "description": "Solid color filling the composition (or `size`).",
+          "type": "object",
+          "properties": {
+            "color": {
+              "$ref": "#/$defs/Property_Color"
+            },
+            "size": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Vec2"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": {
+              "type": "string",
+              "const": "solid"
+            }
+          },
+          "required": [
+            "type",
+            "color"
+          ]
+        },
+        {
+          "description": "Rich text with optional per-character animation.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "text"
+            }
+          },
+          "$ref": "#/$defs/TextSource",
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Vector shape.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "shape"
+            }
+          },
+          "$ref": "#/$defs/ShapeSource",
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Procedural generator effect (noise, speed lines, particles, gradients, ...).",
+          "type": "object",
+          "properties": {
+            "effect": {
+              "type": "string"
+            },
+            "params": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/$defs/Property_Value"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "generator"
+            }
+          },
+          "required": [
+            "type",
+            "effect"
+          ]
+        },
+        {
+          "description": "Nested composition.",
+          "type": "object",
+          "properties": {
+            "comp": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "comp"
+            }
+          },
+          "required": [
+            "type",
+            "comp"
+          ]
+        },
+        {
+          "description": "Applies this clip's effects to everything composited below it.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "adjustment"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        }
+      ]
+    },
+    "Property_Color": {
+      "description": "Animatable property: a static value, or {keyframes, expr, value, loop}.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Color"
+        },
+        {
+          "$ref": "#/$defs/Animated3"
+        }
+      ]
+    },
+    "Animated3": {
+      "type": "object",
+      "properties": {
+        "keyframes": {
+          "description": "Keyframes (clip-local seconds). Sorted automatically.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Keyframe_Color"
+          }
+        },
+        "value": {
+          "description": "Base value when there are no keyframes (used with `expr`).",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Color"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "expr": {
+          "description": "Rhai expression evaluated every frame. Has access to `value` (keyframed value), `t`,\n`time`, beat/audio helpers and more (see the expression reference).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "loop": {
+          "description": "Repeat the keyframed section after the last keyframe.",
+          "$ref": "#/$defs/LoopMode"
+        }
+      },
+      "additionalProperties": false
+    },
+    "Keyframe_Color": {
+      "description": "Keyframe: {t, v, ease} or [t, v, ease]. t = clip-local seconds; ease shapes the segment to the next key.",
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "t": {
+              "type": "number"
+            },
+            "v": {
+              "$ref": "#/$defs/Color"
+            },
+            "ease": {
+              "$ref": "#/$defs/Easing"
+            }
+          },
+          "required": [
+            "t",
+            "v"
+          ]
+        },
+        {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 3
+        }
+      ]
+    },
+    "Vec2": {
+      "description": "2D vector: a number (uniform) or [x, y].",
+      "oneOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 1,
+          "maxItems": 2
+        }
+      ]
+    },
+    "TextAlign": {
+      "type": "string",
+      "enum": [
+        "left",
+        "center",
+        "right"
+      ]
+    },
+    "TextStroke": {
+      "type": "object",
+      "properties": {
+        "color": {
+          "$ref": "#/$defs/Color"
+        },
+        "width": {
+          "description": "Stroke width in pixels (outside the glyph).",
+          "type": "number",
+          "format": "double"
+        }
+      },
+      "required": [
+        "color",
+        "width"
+      ]
+    },
+    "TextShadow": {
+      "type": "object",
+      "properties": {
+        "color": {
+          "$ref": "#/$defs/Color",
+          "default": "#00000099"
+        },
+        "offset": {
+          "$ref": "#/$defs/Vec2",
+          "default": [
+            4.0,
+            4.0
+          ]
+        },
+        "blur": {
+          "description": "Blur radius in pixels.",
+          "type": "number",
+          "format": "double",
+          "default": 8.0
+        }
+      }
+    },
+    "TextBackground": {
+      "type": "object",
+      "properties": {
+        "color": {
+          "$ref": "#/$defs/Color"
+        },
+        "padding": {
+          "$ref": "#/$defs/Vec2",
+          "default": [
+            24.0,
+            12.0
+          ]
+        },
+        "radius": {
+          "type": "number",
+          "format": "double",
+          "default": 0.0
+        }
+      },
+      "required": [
+        "color"
+      ]
+    },
+    "TextAnimator": {
+      "description": "Animates text units from a \"from\" state into place (and optionally out again).",
+      "type": "object",
+      "properties": {
+        "unit": {
+          "$ref": "#/$defs/TextUnit",
+          "default": "char"
+        },
+        "stagger": {
+          "description": "Delay between consecutive units (seconds).",
+          "type": "number",
+          "format": "double",
+          "default": 0.04
+        },
+        "duration": {
+          "description": "Animation duration of each unit (seconds). 0 = instant (typewriter).",
+          "type": "number",
+          "format": "double",
+          "default": 0.35
+        },
+        "start": {
+          "description": "Local time at which the in-animation starts.",
+          "type": "number",
+          "format": "double",
+          "default": 0.0
+        },
+        "ease": {
+          "$ref": "#/$defs/Easing",
+          "default": "ease_out_back"
+        },
+        "order": {
+          "description": "Order in which units animate.",
+          "$ref": "#/$defs/TextOrder",
+          "default": "forward"
+        },
+        "from": {
+          "description": "Starting state of each unit (animates to rest).",
+          "$ref": "#/$defs/UnitState",
+          "default": {
+            "opacity": 0.0,
+            "offset": [
+              0.0,
+              0.0
+            ],
+            "scale": 1.0,
+            "rotation": 0.0
+          }
+        },
+        "out": {
+          "description": "Optional exit animation, ending at the clip end.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TextOut"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "wave": {
+          "description": "Continuous sine wave offset per unit: [amplitude_px, frequency_hz, phase_per_unit].",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "number",
+            "format": "double"
+          },
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "jitter": {
+          "description": "Random per-unit jitter in pixels, changing `jitter_rate` times per second (glitchy text).",
+          "type": "number",
+          "format": "double"
+        },
+        "jitter_rate": {
+          "type": "number",
+          "format": "double",
+          "default": 12.0
+        }
+      }
+    },
+    "TextUnit": {
+      "type": "string",
+      "enum": [
+        "char",
+        "word",
+        "line"
+      ]
+    },
+    "TextOrder": {
+      "type": "string",
+      "enum": [
+        "forward",
+        "backward",
+        "center_out",
+        "edges_in",
+        "random"
+      ]
+    },
+    "UnitState": {
+      "description": "Per-unit animation state (deltas from rest).",
+      "type": "object",
+      "properties": {
+        "opacity": {
+          "type": "number",
+          "format": "double",
+          "default": 0.0
+        },
+        "offset": {
+          "description": "Offset in pixels.",
+          "$ref": "#/$defs/Vec2",
+          "default": [
+            0.0,
+            0.0
+          ]
+        },
+        "scale": {
+          "description": "Scale factor.",
+          "type": "number",
+          "format": "double",
+          "default": 1.0
+        },
+        "rotation": {
+          "description": "Rotation in degrees.",
+          "type": "number",
+          "format": "double",
+          "default": 0.0
+        }
+      }
+    },
+    "TextOut": {
+      "type": "object",
+      "properties": {
+        "stagger": {
+          "type": "number",
+          "format": "double",
+          "default": 0.04
+        },
+        "duration": {
+          "type": "number",
+          "format": "double",
+          "default": 0.35
+        },
+        "ease": {
+          "$ref": "#/$defs/Easing",
+          "default": "ease_in_cubic"
+        },
+        "to": {
+          "$ref": "#/$defs/UnitState",
+          "default": {
+            "opacity": 0.0,
+            "offset": [
+              0.0,
+              0.0
+            ],
+            "scale": 1.0,
+            "rotation": 0.0
+          }
+        }
+      }
+    },
+    "TextSource": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "font": {
+          "description": "Font family name (system font or imported font asset family). Fallbacks are automatic.",
+          "type": "string",
+          "default": "sans-serif"
+        },
+        "weight": {
+          "description": "CSS-like weight (100..900).",
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0,
+          "maximum": 65535,
+          "default": 700
+        },
+        "italic": {
+          "type": "boolean"
+        },
+        "size": {
+          "description": "Font size in pixels.",
+          "type": "number",
+          "format": "double",
+          "default": 96.0
+        },
+        "color": {
+          "$ref": "#/$defs/Property_Color",
+          "default": "#ffffff"
+        },
+        "align": {
+          "$ref": "#/$defs/TextAlign"
+        },
+        "line_height": {
+          "description": "Line height multiplier.",
+          "type": "number",
+          "format": "double",
+          "default": 1.15
+        },
+        "letter_spacing": {
+          "description": "Extra spacing between characters (pixels). Animatable (tracking animation).",
+          "$ref": "#/$defs/Property_double"
+        },
+        "max_width": {
+          "description": "Wrap width in pixels.",
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "stroke": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TextStroke"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "shadow": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TextShadow"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "background": {
+          "description": "Background box behind the text.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TextBackground"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "gradient": {
+          "description": "Vertical gradient fill (overrides color): [top, bottom].",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/Color"
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "animator": {
+          "description": "Per-unit (char/word/line) animation.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TextAnimator"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "uppercase": {
+          "description": "Uppercase the text.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "text"
+      ]
+    },
+    "ShapeKind": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "size": {
+              "$ref": "#/$defs/Vec2"
+            },
+            "radius": {
+              "type": "number",
+              "format": "double",
+              "default": 0.0
+            },
+            "type": {
+              "type": "string",
+              "const": "rect"
+            }
+          },
+          "required": [
+            "type",
+            "size"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "size": {
+              "$ref": "#/$defs/Vec2"
+            },
+            "type": {
+              "type": "string",
+              "const": "ellipse"
+            }
+          },
+          "required": [
+            "type",
+            "size"
+          ]
+        },
+        {
+          "description": "Regular polygon (triangle = 3, hexagon = 6...).",
+          "type": "object",
+          "properties": {
+            "sides": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "radius": {
+              "type": "number",
+              "format": "double"
+            },
+            "type": {
+              "type": "string",
+              "const": "polygon"
+            }
+          },
+          "required": [
+            "type",
+            "sides",
+            "radius"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "points": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "outer_radius": {
+              "type": "number",
+              "format": "double"
+            },
+            "inner_radius": {
+              "type": "number",
+              "format": "double"
+            },
+            "type": {
+              "type": "string",
+              "const": "star"
+            }
+          },
+          "required": [
+            "type",
+            "points",
+            "outer_radius",
+            "inner_radius"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "from": {
+              "$ref": "#/$defs/Vec2"
+            },
+            "to": {
+              "$ref": "#/$defs/Vec2"
+            },
+            "type": {
+              "type": "string",
+              "const": "line"
+            }
+          },
+          "required": [
+            "type",
+            "from",
+            "to"
+          ]
+        },
+        {
+          "description": "Ring / donut.",
+          "type": "object",
+          "properties": {
+            "outer_radius": {
+              "type": "number",
+              "format": "double"
+            },
+            "inner_radius": {
+              "type": "number",
+              "format": "double"
+            },
+            "type": {
+              "type": "string",
+              "const": "ring"
+            }
+          },
+          "required": [
+            "type",
+            "outer_radius",
+            "inner_radius"
+          ]
+        },
+        {
+          "description": "SVG path data in local pixels (centered at 0,0).",
+          "type": "object",
+          "properties": {
+            "d": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "path"
+            }
+          },
+          "required": [
+            "type",
+            "d"
+          ]
+        }
+      ]
+    },
+    "Fill": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Color"
+        },
+        {
+          "$ref": "#/$defs/GradientFill"
+        }
+      ]
+    },
+    "GradientFill": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/GradientKind",
+          "default": "linear"
+        },
+        "stops": {
+          "description": "[offset 0..1, color] pairs.",
+          "type": "array",
+          "items": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "type": "number",
+                "format": "double"
+              },
+              {
+                "$ref": "#/$defs/Color"
+              }
+            ],
+            "minItems": 2,
+            "maxItems": 2
+          }
+        },
+        "angle": {
+          "description": "Angle in degrees for linear gradients.",
+          "type": "number",
+          "format": "double",
+          "default": 0.0
+        }
+      },
+      "required": [
+        "stops"
+      ]
+    },
+    "GradientKind": {
+      "type": "string",
+      "enum": [
+        "linear",
+        "radial"
+      ]
+    },
+    "ShapeStroke": {
+      "type": "object",
+      "properties": {
+        "color": {
+          "$ref": "#/$defs/Color"
+        },
+        "width": {
+          "type": "number",
+          "format": "double"
+        },
+        "dash": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "cap": {
+          "$ref": "#/$defs/LineCap",
+          "default": "round"
+        }
+      },
+      "required": [
+        "color",
+        "width"
+      ]
+    },
+    "LineCap": {
+      "type": "string",
+      "enum": [
+        "round",
+        "butt",
+        "square"
+      ]
+    },
+    "Trim": {
+      "type": "object",
+      "properties": {
+        "start": {
+          "$ref": "#/$defs/Property_double",
+          "default": 0.0
+        },
+        "end": {
+          "$ref": "#/$defs/Property_double",
+          "default": 1.0
+        },
+        "offset": {
+          "description": "Offset (0..1) rotating where the path starts.",
+          "$ref": "#/$defs/Property_double",
+          "default": 0.0
+        }
+      }
+    },
+    "ShapeSource": {
+      "type": "object",
+      "properties": {
+        "shape": {
+          "$ref": "#/$defs/ShapeKind"
+        },
+        "fill": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Fill"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stroke": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ShapeStroke"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "trim": {
+          "description": "Trim paths: draw only [start, end] fraction of the outline (stroke draw-on animations).",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Trim"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "shape"
+      ]
+    },
+    "EndBehavior": {
+      "oneOf": [
+        {
+          "description": "Hold the last frame.",
+          "type": "string",
+          "const": "hold"
+        },
+        {
+          "description": "Loop the source.",
+          "type": "string",
+          "const": "loop"
+        },
+        {
+          "description": "Bounce back and forth.",
+          "type": "string",
+          "const": "ping_pong"
+        },
+        {
+          "description": "Render nothing once the source ends.",
+          "type": "string",
+          "const": "transparent"
+        }
+      ]
+    },
+    "Transform": {
+      "type": "object",
+      "properties": {
+        "position": {
+          "description": "Offset of the layer center from the composition center (pixels).",
+          "$ref": "#/$defs/Property_Vec2"
+        },
+        "anchor": {
+          "description": "Anchor point offset from the layer center (pixels, layer space). Rotation/scale pivot.",
+          "$ref": "#/$defs/Property_Vec2"
+        },
+        "scale": {
+          "description": "Scale factor (1 = 100%). Number or [x, y].",
+          "$ref": "#/$defs/Property_Vec2"
+        },
+        "rotation": {
+          "description": "Rotation in degrees (clockwise).",
+          "$ref": "#/$defs/Property_double"
+        },
+        "rotation_x": {
+          "description": "3D rotation around the X axis (degrees) — tilts toward/away from camera.",
+          "$ref": "#/$defs/Property_double"
+        },
+        "rotation_y": {
+          "description": "3D rotation around the Y axis (degrees).",
+          "$ref": "#/$defs/Property_double"
+        },
+        "z": {
+          "description": "Depth in pixels (positive = further away = smaller).",
+          "$ref": "#/$defs/Property_double"
+        },
+        "skew": {
+          "description": "Skew in degrees along X.",
+          "$ref": "#/$defs/Property_double"
+        },
+        "perspective": {
+          "description": "Camera distance for perspective (pixels). Default ≈ 1.2 × composition width.",
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "flip_x": {
+          "description": "Flip horizontally / vertically.",
+          "type": "boolean"
+        },
+        "flip_y": {
+          "type": "boolean"
+        }
+      }
+    },
+    "Property_Vec2": {
+      "description": "Animatable property: a static value, or {keyframes, expr, value, loop}.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Vec2"
+        },
+        {
+          "$ref": "#/$defs/Animated4"
+        }
+      ]
+    },
+    "Animated4": {
+      "type": "object",
+      "properties": {
+        "keyframes": {
+          "description": "Keyframes (clip-local seconds). Sorted automatically.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Keyframe_Vec2"
+          }
+        },
+        "value": {
+          "description": "Base value when there are no keyframes (used with `expr`).",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Vec2"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "expr": {
+          "description": "Rhai expression evaluated every frame. Has access to `value` (keyframed value), `t`,\n`time`, beat/audio helpers and more (see the expression reference).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "loop": {
+          "description": "Repeat the keyframed section after the last keyframe.",
+          "$ref": "#/$defs/LoopMode"
+        }
+      },
+      "additionalProperties": false
+    },
+    "Keyframe_Vec2": {
+      "description": "Keyframe: {t, v, ease} or [t, v, ease]. t = clip-local seconds; ease shapes the segment to the next key.",
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "t": {
+              "type": "number"
+            },
+            "v": {
+              "$ref": "#/$defs/Vec2"
+            },
+            "ease": {
+              "$ref": "#/$defs/Easing"
+            }
+          },
+          "required": [
+            "t",
+            "v"
+          ]
+        },
+        {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 3
+        }
+      ]
+    },
+    "Fit": {
+      "oneOf": [
+        {
+          "description": "Fit inside the composition, preserving aspect ratio.",
+          "type": "string",
+          "const": "contain"
+        },
+        {
+          "description": "Fill the composition, cropping overflow.",
+          "type": "string",
+          "const": "cover"
+        },
+        {
+          "description": "Stretch to the composition size.",
+          "type": "string",
+          "const": "stretch"
+        },
+        {
+          "description": "Native pixel size.",
+          "type": "string",
+          "const": "none"
+        },
+        {
+          "description": "Fit to composition width.",
+          "type": "string",
+          "const": "width"
+        },
+        {
+          "description": "Fit to composition height.",
+          "type": "string",
+          "const": "height"
+        }
+      ]
+    },
+    "Mask": {
+      "type": "object",
+      "properties": {
+        "shape": {
+          "$ref": "#/$defs/MaskShape"
+        },
+        "mode": {
+          "$ref": "#/$defs/MaskMode"
+        },
+        "feather": {
+          "description": "Feather (soft edge) in pixels.",
+          "$ref": "#/$defs/Property_double"
+        },
+        "expansion": {
+          "description": "Grow (+) or shrink (-) the mask in pixels.",
+          "$ref": "#/$defs/Property_double"
+        },
+        "opacity": {
+          "$ref": "#/$defs/Property_double"
+        },
+        "invert": {
+          "type": "boolean"
+        },
+        "offset": {
+          "description": "Offset applied to the mask shape (pixels).",
+          "$ref": "#/$defs/Property_Vec2"
+        },
+        "rotation": {
+          "description": "Rotation of the shape (degrees).",
+          "$ref": "#/$defs/Property_double"
+        },
+        "scale": {
+          "description": "Scale of the shape.",
+          "$ref": "#/$defs/Property_Vec2"
+        }
+      },
+      "required": [
+        "shape"
+      ]
+    },
+    "MaskShape": {
+      "description": "Mask geometry in composition pixels relative to the composition center.",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "center": {
+              "$ref": "#/$defs/Property_Vec2",
+              "default": [
+                0.0,
+                0.0
+              ]
+            },
+            "size": {
+              "$ref": "#/$defs/Property_Vec2"
+            },
+            "radius": {
+              "$ref": "#/$defs/Property_double",
+              "default": 0.0
+            },
+            "type": {
+              "type": "string",
+              "const": "rect"
+            }
+          },
+          "required": [
+            "type",
+            "size"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "center": {
+              "$ref": "#/$defs/Property_Vec2",
+              "default": [
+                0.0,
+                0.0
+              ]
+            },
+            "size": {
+              "$ref": "#/$defs/Property_Vec2"
+            },
+            "type": {
+              "type": "string",
+              "const": "ellipse"
+            }
+          },
+          "required": [
+            "type",
+            "size"
+          ]
+        },
+        {
+          "description": "Closed polygon (up to 64 points), composition pixels relative to center.",
+          "type": "object",
+          "properties": {
+            "points": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Vec2"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "polygon"
+            }
+          },
+          "required": [
+            "type",
+            "points"
+          ]
+        },
+        {
+          "description": "SVG path data (`M 0 0 C ...`), composition pixels relative to center. Flattened to a polygon.",
+          "type": "object",
+          "properties": {
+            "d": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "path"
+            }
+          },
+          "required": [
+            "type",
+            "d"
+          ]
+        }
+      ]
+    },
+    "MaskMode": {
+      "type": "string",
+      "enum": [
+        "add",
+        "subtract",
+        "intersect",
+        "difference"
+      ]
+    },
+    "Matte": {
+      "type": "object",
+      "properties": {
+        "clip": {
+          "description": "Clip id whose rendered layer is used as the matte (often a `hidden` clip).",
+          "type": "string"
+        },
+        "mode": {
+          "$ref": "#/$defs/MatteMode"
+        }
+      },
+      "required": [
+        "clip"
+      ]
+    },
+    "MatteMode": {
+      "type": "string",
+      "enum": [
+        "alpha",
+        "alpha_inverted",
+        "luma",
+        "luma_inverted"
+      ]
+    },
+    "Transition": {
+      "type": "object",
+      "properties": {
+        "effect": {
+          "description": "Transition effect id (kind = \"transition\" in the library).",
+          "type": "string"
+        },
+        "duration": {
+          "description": "Duration in seconds, starting at the clip's start.",
+          "type": "number",
+          "format": "double"
+        },
+        "ease": {
+          "description": "Easing of the transition progress.",
+          "$ref": "#/$defs/Easing"
+        },
+        "params": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Property_Value"
+          }
+        },
+        "centered": {
+          "description": "Center the transition on the cut (starts `duration/2` before the clip start). Requires the\nprevious clip to overlap or have source handles.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "effect",
+        "duration"
+      ]
+    },
+    "Echo": {
+      "type": "object",
+      "properties": {
+        "count": {
+          "description": "Number of echoes (1..32).",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0,
+          "default": 4
+        },
+        "interval": {
+          "description": "Seconds between echoes (negative = future frames).",
+          "type": "number",
+          "format": "double",
+          "default": 0.041666666666666664
+        },
+        "decay": {
+          "description": "Opacity multiplier per echo step (0..1).",
+          "type": "number",
+          "format": "double",
+          "default": 0.6
+        },
+        "blend": {
+          "description": "How echoes combine with each other.",
+          "$ref": "#/$defs/BlendMode",
+          "default": "add"
+        },
+        "behind": {
+          "description": "Draw echoes behind (true) or over (false) the main frame.",
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "ClipAudio": {
+      "type": "object",
+      "properties": {
+        "volume": {
+          "description": "Linear gain (1 = unchanged, 0 = silent, 2 ≈ +6 dB).",
+          "$ref": "#/$defs/Property_double"
+        },
+        "pan": {
+          "description": "Stereo pan -1 (left) .. 1 (right).",
+          "$ref": "#/$defs/Property_double"
+        },
+        "mute": {
+          "type": "boolean"
+        },
+        "fade_in": {
+          "description": "Fade-in length (seconds).",
+          "type": "number",
+          "format": "double"
+        },
+        "fade_out": {
+          "description": "Fade-out length (seconds).",
+          "type": "number",
+          "format": "double"
+        },
+        "effects": {
+          "description": "Audio effects (lowpass, highpass, echo, distortion, bitcrush, stutter...).",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AudioEffect"
+          }
+        }
+      }
+    },
+    "AudioEffect": {
+      "oneOf": [
+        {
+          "description": "Low-pass filter (muffled \"underwater\" sound when cutoff is low). Animatable cutoff (Hz).",
+          "type": "object",
+          "properties": {
+            "cutoff": {
+              "$ref": "#/$defs/Property_double"
+            },
+            "q": {
+              "type": "number",
+              "format": "double",
+              "default": 0.707
+            },
+            "type": {
+              "type": "string",
+              "const": "lowpass"
+            }
+          },
+          "required": [
+            "type",
+            "cutoff"
+          ]
+        },
+        {
+          "description": "High-pass filter (thin \"radio\" sound).",
+          "type": "object",
+          "properties": {
+            "cutoff": {
+              "$ref": "#/$defs/Property_double"
+            },
+            "q": {
+              "type": "number",
+              "format": "double",
+              "default": 0.707
+            },
+            "type": {
+              "type": "string",
+              "const": "highpass"
+            }
+          },
+          "required": [
+            "type",
+            "cutoff"
+          ]
+        },
+        {
+          "description": "Feedback delay.",
+          "type": "object",
+          "properties": {
+            "delay": {
+              "type": "number",
+              "format": "double",
+              "default": 0.25
+            },
+            "feedback": {
+              "type": "number",
+              "format": "double",
+              "default": 0.35
+            },
+            "mix": {
+              "type": "number",
+              "format": "double",
+              "default": 0.35
+            },
+            "type": {
+              "type": "string",
+              "const": "echo"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Soft-clip distortion.",
+          "type": "object",
+          "properties": {
+            "drive": {
+              "type": "number",
+              "format": "double",
+              "default": 4.0
+            },
+            "type": {
+              "type": "string",
+              "const": "distortion"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Bit depth / sample-rate reduction.",
+          "type": "object",
+          "properties": {
+            "bits": {
+              "type": "number",
+              "format": "double",
+              "default": 8.0
+            },
+            "downsample": {
+              "type": "number",
+              "format": "double",
+              "default": 4.0
+            },
+            "type": {
+              "type": "string",
+              "const": "bitcrush"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Repeat short slices (stutter edit). `slice` seconds, repeats within [start, end] local time.",
+          "type": "object",
+          "properties": {
+            "start": {
+              "type": "number",
+              "format": "double"
+            },
+            "end": {
+              "type": "number",
+              "format": "double"
+            },
+            "slice": {
+              "type": "number",
+              "format": "double"
+            },
+            "type": {
+              "type": "string",
+              "const": "stutter"
+            }
+          },
+          "required": [
+            "type",
+            "start",
+            "end",
+            "slice"
+          ]
+        },
+        {
+          "description": "Gain in decibels.",
+          "type": "object",
+          "properties": {
+            "db": {
+              "$ref": "#/$defs/Property_double"
+            },
+            "type": {
+              "type": "string",
+              "const": "gain"
+            }
+          },
+          "required": [
+            "type",
+            "db"
+          ]
+        }
+      ]
+    },
+    "Marker": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "default": ""
+        },
+        "t": {
+          "type": "number",
+          "format": "double"
+        },
+        "label": {
+          "type": "string"
+        },
+        "color": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Color"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "duration": {
+          "type": "number",
+          "format": "double"
+        }
+      },
+      "required": [
+        "t"
+      ]
+    },
+    "MotionBlur": {
+      "type": "object",
+      "properties": {
+        "samples": {
+          "description": "Number of sub-frame samples (1 = off). 8-16 looks great for fast zooms/shakes.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0,
+          "default": 8
+        },
+        "shutter_angle": {
+          "description": "Shutter angle in degrees (180 = film look, 360 = maximum smear).",
+          "type": "number",
+          "format": "double",
+          "default": 180.0
+        }
+      }
+    },
+    "Asset": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "description": "File path (absolute, or relative to the project file). For image sequences use a pattern\nlike `frames/img_%04d.png` or a directory.",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/AssetKind",
+          "default": "auto"
+        },
+        "name": {
+          "type": "string"
+        },
+        "info": {
+          "description": "Probed metadata (filled on import).",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MediaInfo"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sequence_fps": {
+          "description": "Frame rate for image sequences.",
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "notes": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ]
+    },
+    "AssetKind": {
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "video",
+            "audio",
+            "image",
+            "svg",
+            "image_sequence",
+            "font"
+          ]
+        },
+        {
+          "description": "Detect from the file.",
+          "type": "string",
+          "const": "auto"
+        },
+        {
+          "description": "Animated GIF / WebP / APNG.",
+          "type": "string",
+          "const": "animated_image"
+        },
+        {
+          "description": "3D LUT (.cube) for the `lut` effect.",
+          "type": "string",
+          "const": "lut"
+        },
+        {
+          "description": "Lyrics / subtitles (.lrc, .srt, .vtt, .ass).",
+          "type": "string",
+          "const": "subtitles"
+        },
+        {
+          "description": "Arbitrary data (JSON/CSV/text), readable from scripts.",
+          "type": "string",
+          "const": "data"
+        }
+      ]
+    },
+    "MediaInfo": {
+      "type": "object",
+      "properties": {
+        "width": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "height": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "fps": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "duration": {
+          "description": "Duration in seconds (None for still images).",
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "has_video": {
+          "type": "boolean"
+        },
+        "has_audio": {
+          "type": "boolean"
+        },
+        "video_codec": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "audio_codec": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sample_rate": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "channels": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "frames": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "has_alpha": {
+          "type": "boolean"
+        },
+        "families": {
+          "description": "Font family names (for font assets).",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "Timing": {
+      "description": "Musical structure of the edit. Filled by audio analysis (`analyze_audio` with apply) or by hand.",
+      "type": "object",
+      "properties": {
+        "source": {
+          "description": "Asset id of the music track the timing was derived from.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "offset": {
+          "description": "Offset added to all beat times (seconds), e.g. if the music clip starts later in the timeline.",
+          "type": "number",
+          "format": "double"
+        },
+        "bpm": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "beats": {
+          "description": "Beat times (seconds, timeline time = value + offset).",
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "downbeats": {
+          "description": "Downbeats (first beat of each bar).",
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "drops": {
+          "description": "Big energy hits / drops.",
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "accents": {
+          "description": "Strong onsets (snares, hits) that aren't necessarily on the beat grid.",
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "sections": {
+          "description": "Song sections.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Section"
+          }
+        }
+      }
+    },
+    "Section": {
+      "type": "object",
+      "properties": {
+        "start": {
+          "type": "number",
+          "format": "double"
+        },
+        "end": {
+          "type": "number",
+          "format": "double"
+        },
+        "label": {
+          "description": "e.g. \"intro\", \"build\", \"drop\", \"break\", \"outro\"",
+          "type": "string",
+          "default": ""
+        },
+        "energy": {
+          "description": "Relative energy 0..1.",
+          "type": "number",
+          "format": "double",
+          "default": 0.0
+        }
+      },
+      "required": [
+        "start",
+        "end"
+      ]
+    }
+  }
+}

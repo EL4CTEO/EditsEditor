@@ -144,9 +144,36 @@ impl TextRenderer {
                 "fantasy" => Family::Fantasy,
                 _ => Family::Name(&src.font),
             };
+            // Snap to the nearest weight the family really has; otherwise cosmic-text falls back
+            // glyph-by-glyph to other fonts with different metrics (wide gaps, mixed styles).
+            let mut fam_name = match fam {
+                Family::Name(n) => n.to_string(),
+                other => fs.db().family_name(&other).to_string(),
+            };
+            let has = |db: &cosmic_text::fontdb::Database, n: &str| db.faces().any(|f| f.families.iter().any(|(x, _)| x.eq_ignore_ascii_case(n)));
+            if !has(fs.db(), &fam_name) {
+                // resolve through the matcher (handles generic names and missing families)
+                let q = cosmic_text::fontdb::Query { families: &[fam, Family::SansSerif], ..Default::default() };
+                let resolved = fs.db().query(&q).and_then(|id| fs.db().face(id)).and_then(|f| f.families.first().map(|(n, _)| n.clone()));
+                let fallback = fs.db().faces().find(|f| f.families.iter().any(|(n, _)| {
+                    let l = n.to_ascii_lowercase();
+                    l.contains("segoe ui") || l.contains("noto sans") || l.contains("dejavu sans") || l.contains("liberation sans") || l == "arial"
+                })).and_then(|f| f.families.first().map(|(n, _)| n.clone()));
+                if let Some(r) = resolved.or(fallback) {
+                    fam_name = r;
+                }
+            }
+            let want = src.weight as i32;
+            let weight = fs
+                .db()
+                .faces()
+                .filter(|f| f.families.iter().any(|(n, _)| n.eq_ignore_ascii_case(&fam_name)))
+                .map(|f| f.weight.0)
+                .min_by_key(|w| (*w as i32 - want).abs() * 2 + if (*w as i32) < want { 1 } else { 0 })
+                .unwrap_or(src.weight);
             let attrs = Attrs::new()
-                .family(fam)
-                .weight(Weight(src.weight))
+                .family(Family::Name(&fam_name))
+                .weight(Weight(weight))
                 .style(if src.italic { Style::Italic } else { Style::Normal });
             buf.set_text(&text, &attrs, Shaping::Advanced, None);
             buf.shape_until_scroll(fs, false);
@@ -317,7 +344,7 @@ impl TextRenderer {
                 let x0 = phys.x as f32 + pl.left as f32;
                 let y0 = phys.y as f32 - pl.top as f32;
                 // pivot: glyph center
-                let cx = gx + g.w / 2.0;
+                let cx = gx + g.x + g.w / 2.0;
                 let cy = gy - size * 0.35;
                 let transformed = (sc - 1.0).abs() > 1e-4 || rot.abs() > 1e-4 || dx.abs() > 1e-4 || dy.abs() > 1e-4;
                 let (cs, sn) = ((-rot.to_radians()).cos() as f32, (-rot.to_radians()).sin() as f32);
