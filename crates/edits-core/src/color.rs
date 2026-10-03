@@ -80,9 +80,9 @@ impl Color {
         if v.len() < 3 {
             return None;
         }
-        let scale = if v.iter().take(3).any(|c| *c > 1.0) { 255.0 } else { 1.0 };
+        let scale = if v.iter().take(3).any(|c| *c > 1.0 + 1e-6) && v.iter().take(3).all(|c| *c >= 0.0 && *c <= 255.0 && c.fract() == 0.0) { 255.0 } else { 1.0 };
         let a = v.get(3).copied().unwrap_or(1.0);
-        let a = if a > 1.0 { a / 255.0 } else { a };
+        let a = if scale == 255.0 && a > 1.0 { a / 255.0 } else { a };
         Some(Color([
             (v[0] / scale) as f32,
             (v[1] / scale) as f32,
@@ -210,9 +210,23 @@ fn named(name: &str) -> Option<&'static str> {
     })
 }
 
+impl Color {
+    /// True if every channel is exactly representable in 8 bits (so hex is lossless).
+    pub fn is_8bit(&self) -> bool {
+        self.0.iter().all(|c| {
+            let v = c * 255.0;
+            (v - v.round()).abs() < 1e-4 && (0.0..=1.0).contains(c)
+        })
+    }
+}
+
 impl Serialize for Color {
     fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
-        s.serialize_str(&self.to_hex())
+        if self.is_8bit() {
+            s.serialize_str(&self.to_hex())
+        } else {
+            self.0.serialize(s)
+        }
     }
 }
 
@@ -259,5 +273,8 @@ mod tests {
         let h = Color::parse("hsl(120, 100%, 50%)").unwrap();
         assert!((h.0[1] - 1.0).abs() < 1e-6 && h.0[0].abs() < 1e-6);
         assert_eq!(Color::parse("#ff000080").unwrap().to_hex(), "#ff000080");
+        let c = Color([0.1, 0.0, 0.2, 1.0]);
+        let back: Color = serde_json::from_str(&serde_json::to_string(&c).unwrap()).unwrap();
+        assert_eq!(c, back);
     }
 }

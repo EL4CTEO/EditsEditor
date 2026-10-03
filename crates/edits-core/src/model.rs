@@ -613,7 +613,7 @@ impl ClipSource {
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Transform {
     /// Offset of the layer center from the composition center (pixels).
     #[serde(default = "zero_vec", skip_serializing_if = "is_zero_vec")]
@@ -647,6 +647,24 @@ pub struct Transform {
     pub flip_x: bool,
     #[serde(default, skip_serializing_if = "is_default")]
     pub flip_y: bool,
+}
+
+impl Default for Transform {
+    fn default() -> Self {
+        Transform {
+            position: zero_vec(),
+            anchor: zero_vec(),
+            scale: one_vec(),
+            rotation: zero_prop(),
+            rotation_x: zero_prop(),
+            rotation_y: zero_prop(),
+            z: zero_prop(),
+            skew: zero_prop(),
+            perspective: None,
+            flip_x: false,
+            flip_y: false,
+        }
+    }
 }
 
 /// Evaluated transform at one instant.

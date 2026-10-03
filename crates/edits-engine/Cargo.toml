@@ -1,6 +1,34 @@
 [package]
 name = "edits-engine"
-version = "0.1.0"
-edition = "2024"
+description = "EditsEditor engine: project sessions, frame evaluation, expressions, scripting, presets, export"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
 
 [dependencies]
+edits-core.workspace = true
+edits-fx.workspace = true
+edits-media.workspace = true
+edits-audio.workspace = true
+edits-render.workspace = true
+rhai.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+schemars.workspace = true
+indexmap.workspace = true
+parking_lot.workspace = true
+rayon.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+glob.workspace = true
+dirs.workspace = true
+blake3.workspace = true
+tempfile.workspace = true
+image.workspace = true
+json-patch.workspace = true
+lru.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
