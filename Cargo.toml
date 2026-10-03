@@ -1,0 +1,100 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+default-members = ["crates/edits-cli"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.90"
+license = "MIT"
+repository = "https://github.com/EL4CTEO/EditsEditor"
+authors = ["EditsEditor contributors"]
+
+[workspace.dependencies]
+# internal
+edits-core = { path = "crates/edits-core" }
+edits-fx = { path = "crates/edits-fx" }
+edits-media = { path = "crates/edits-media" }
+edits-audio = { path = "crates/edits-audio" }
+edits-render = { path = "crates/edits-render" }
+edits-engine = { path = "crates/edits-engine" }
+edits-mcp = { path = "crates/edits-mcp" }
+
+# serialization / data
+serde = { version = "1.0.229", features = ["derive", "rc"] }
+serde_json = { version = "1.0.151", features = ["preserve_order"] }
+schemars = { version = "1.2.2", features = ["indexmap2"] }
+indexmap = { version = "2.14.2", features = ["serde"] }
+toml = "1.1.6"
+json-patch = "4.2.0"
+base64 = "0.23.1"
+blake3 = "1.8.7"
+
+# errors / logging
+anyhow = "1.0.104"
+thiserror = "2.0.21"
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+
+# concurrency
+parking_lot = "0.12.5"
+crossbeam-channel = "0.5.17"
+rayon = "1.12.0"
+tokio = { version = "1.53.2", features = ["rt-multi-thread", "macros", "io-std", "sync", "time", "process"] }
+lru = "0.18.5"
+
+# gpu / graphics
+wgpu = "30.0.1"
+naga = { version = "30.0.1", features = ["wgsl-in"] }
+bytemuck = { version = "1.25.2", features = ["derive"] }
+glam = { version = "0.33.12", features = ["bytemuck"] }
+pollster = "1.0.1"
+half = { version = "2.7.1", features = ["bytemuck"] }
+image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp", "tiff", "tga", "ico", "hdr", "exr", "qoi", "pnm", "dds", "rayon"] }
+resvg = "0.48.1"
+tiny-skia = "0.12.0"
+kurbo = "0.13.1"
+cosmic-text = "0.19.0"
+
+# audio / dsp
+realfft = "3.5.0"
+cpal = "0.18.2"
+
+# scripting
+rhai = { version = "1.26.1", features = ["sync", "serde", "no_custom_syntax", "internals"] }
+
+# misc
+clap = { version = "4.6.7", features = ["derive", "env"] }
+which = "8.0.6"
+glob = "0.3.4"
+tempfile = "3.27.0"
+dirs = "7.0.0"
+fastrand = "2.5.0"
+
+# MCP
+rmcp = { version = "3.5.0", features = ["server", "transport-io", "macros"] }
+
+# viewer
+eframe = { version = "0.36.2", default-features = false, features = ["wgpu", "default_fonts", "accesskit"] }
+egui = "0.36.2"
+egui_extras = "0.36.2"
+rfd = "0.17.2"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+opt-level = 3
+strip = "symbols"
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[workspace.lints.clippy]
+# DSP/image kernels index several buffers in lockstep; explicit indices read clearer there.
+needless_range_loop = "allow"
+too_many_arguments = "allow"
+type_complexity = "allow"

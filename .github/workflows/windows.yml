@@ -1,0 +1,74 @@
+name: windows
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  RUST_BACKTRACE: 1
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install FFmpeg
+        run: choco install ffmpeg -y --no-progress
+
+      - name: Format
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Test
+        # GPU tests run on WARP (the D3D12 software adapter) on hosted runners.
+        run: |
+          $env:PATH = "C:\ProgramData\chocolatey\bin;$env:PATH"
+          cargo test --workspace --release
+
+      - name: Build release binaries
+        run: cargo build --release -p edits-cli -p edits-viewer
+
+      - name: Smoke test
+        run: |
+          $env:PATH = "C:\ProgramData\chocolatey\bin;$env:PATH"
+          ./target/release/edits.exe --software-gpu doctor
+          ./target/release/edits.exe new smoke.edits.json --width 640 --height 360 --duration 12
+          ./target/release/edits.exe script smoke.edits.json examples/showcase.rhai
+          ./target/release/edits.exe validate smoke.edits.json
+          ./target/release/edits.exe --software-gpu render smoke.edits.json -o smoke.mp4 --codec h264 --no-hw
+
+      - name: Package
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item target/release/edits.exe, target/release/edits-viewer.exe, README.md, LICENSE dist/
+          Copy-Item -Recurse docs, examples dist/
+          Compress-Archive -Path dist/* -DestinationPath EditsEditor-windows-x64.zip -Force
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EditsEditor-windows-x64
+          path: EditsEditor-windows-x64.zip
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: EditsEditor-windows-x64.zip
+          generate_release_notes: true

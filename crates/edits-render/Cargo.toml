@@ -1,0 +1,25 @@
+[package]
+name = "edits-render"
+description = "wgpu compositor, effect runner, text and shape rasterization for EditsEditor"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+edits-core.workspace = true
+edits-fx.workspace = true
+edits-media.workspace = true
+wgpu.workspace = true
+bytemuck.workspace = true
+pollster.workspace = true
+parking_lot.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+lru.workspace = true
+cosmic-text.workspace = true
+tiny-skia.workspace = true
+kurbo.workspace = true
+
+[lints]
+workspace = true
